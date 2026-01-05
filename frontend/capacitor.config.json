@@ -1,0 +1,17 @@
+{
+  "appId": "com.fps.monitor",
+  "appName": "FPS Monitor",
+  "webDir": "dist",
+  "server": {
+    "androidScheme": "http"
+  },
+  "plugins": {
+    "SplashScreen": {
+      "launchShowDuration": 0
+    },
+    "StatusBar": {
+      "overlaysWebView": true,
+      "backgroundColor": "#00000000"
+    }
+  }
+}

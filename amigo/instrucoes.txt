@@ -1,0 +1,34 @@
+INSTRUÇÕES DE INSTALAÇÃO E USO
+
+1. INSTALAÇÃO NO PC (Windows)
+---------------------------------------------------------
+Para que o monitor funcione, é necessário ter o MSI Afterburner e o RivaTuner Statistics Server (RTSS) instalados e rodando. Eles são responsáveis por coletar os dados do hardware (FPS, Temperatura, Uso, etc).
+
+PASSO A: Instalar MSI Afterburner + RTSS
+- Baixe e instale o MSI Afterburner (o RTSS geralmente vem junto no instalador).
+- Link Oficial: https://www.msi.com/Landing/afterburner/graphics-cards
+- Durante a instalação, certifique-se de marcar a opção para instalar o "RivaTuner Statistics Server".
+
+PASSO B: Executar o Servidor
+- Nesta pasta, execute o arquivo "FPSMonitorServer.exe".
+- Uma janela preta (console) irá abrir. Isso significa que o servidor está rodando.
+- Se o Firewall do Windows perguntar, clique em "Permitir Acesso" (Allow Access) para redes privadas.
+- Mantenha essa janela aberta enquanto quiser usar o aplicativo no celular.
+
+2. INSTALAÇÃO NO CELULAR (Android)
+---------------------------------------------------------
+PASSO A: Instalar o Aplicativo
+- Transfira o arquivo "FPSMonitor.apk" desta pasta para o seu celular (via cabo USB, WhatsApp, Drive, etc).
+- No celular, clique no arquivo para instalar.
+- Se for solicitado, permita a instalação de "Fontes Desconhecidas" (ou "Instalar apps desconhecidos") nas configurações do seu Android.
+
+PASSO B: Conectar
+- Certifique-se de que o celular e o PC estão conectados na MESMA rede Wi-Fi.
+- Abra o aplicativo "FPS Monitor" no celular.
+- O aplicativo deve tentar conectar automaticamente.
+- Se não conectar, olhe na janela preta do servidor no PC. Ela deve mostrar o "IP Local" (ex: 192.168.1.X).
+- No aplicativo do celular, digite esse IP e a porta (geralmente 8000) se solicitado.
+
+DICAS DE USO:
+- Abra o MSI Afterburner antes de abrir o jogo.
+- O servidor precisa estar rodando para o celular receber os dados.
