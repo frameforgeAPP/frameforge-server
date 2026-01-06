@@ -1,10 +1,25 @@
 import React, { useState, useEffect } from 'react';
-import { Settings, ArrowLeft } from 'lucide-react';
+import { Settings, ArrowLeft, Sun } from 'lucide-react';
+import { ScreenBrightness } from '@capacitor-community/screen-brightness';
 
 export default function Clock({ toggleFullScreen, serverAddress, setServerAddress, onDismiss }) {
     const [time, setTime] = useState(new Date());
     const [showSettings, setShowSettings] = useState(false);
     const [tempAddress, setTempAddress] = useState(serverAddress || '');
+    const [clockColor, setClockColor] = useState(localStorage.getItem('clockColor') || '#ffffff');
+    const [tempColor, setTempColor] = useState(clockColor);
+    const [brightness, setBrightness] = useState(1);
+
+    const colors = [
+        { name: 'White', value: '#ffffff' },
+        { name: 'Gray', value: '#9ca3af' },
+        { name: 'Red', value: '#ef4444' },
+        { name: 'Green', value: '#22c55e' },
+        { name: 'Blue', value: '#3b82f6' },
+        { name: 'Yellow', value: '#eab308' },
+        { name: 'Purple', value: '#a855f7' },
+        { name: 'Cyan', value: '#06b6d4' }
+    ];
 
     useEffect(() => {
         const timer = setInterval(() => {
@@ -19,6 +34,34 @@ export default function Clock({ toggleFullScreen, serverAddress, setServerAddres
         setTempAddress(serverAddress || '');
     }, [serverAddress]);
 
+    // Update tempColor when clockColor changes
+    useEffect(() => {
+        setTempColor(clockColor);
+    }, [clockColor]);
+
+    // Initialize brightness
+    useEffect(() => {
+        const initBrightness = async () => {
+            try {
+                const { brightness } = await ScreenBrightness.getBrightness();
+                setBrightness(brightness);
+            } catch (e) {
+                console.error('Error getting brightness', e);
+            }
+        };
+        initBrightness();
+    }, []);
+
+    const handleBrightnessChange = async (e) => {
+        const newBrightness = parseFloat(e.target.value);
+        setBrightness(newBrightness);
+        try {
+            await ScreenBrightness.setBrightness({ brightness: newBrightness });
+        } catch (err) {
+            console.error('Error setting brightness', err);
+        }
+    };
+
     const formatTime = (date) => {
         return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
     };
@@ -27,6 +70,8 @@ export default function Clock({ toggleFullScreen, serverAddress, setServerAddres
         e.stopPropagation();
         localStorage.setItem('serverAddress', tempAddress);
         setServerAddress(tempAddress);
+        localStorage.setItem('clockColor', tempColor);
+        setClockColor(tempColor);
         setShowSettings(false);
     };
 
@@ -64,7 +109,8 @@ export default function Clock({ toggleFullScreen, serverAddress, setServerAddres
                 className="font-bold leading-none tracking-tighter select-none"
                 style={{
                     fontFamily: 'Inter, sans-serif',
-                    fontSize: '35vw'
+                    fontSize: '35vw',
+                    color: clockColor
                 }}
             >
                 {formatTime(time)}
@@ -99,6 +145,38 @@ export default function Clock({ toggleFullScreen, serverAddress, setServerAddres
                             >
                                 Use Auto-Discovery (fps-monitor.local)
                             </button>
+                        </div>
+
+                        <div className="mb-6">
+                            <label className="block text-xs text-gray-400 mb-2">Clock Color</label>
+                            <div className="flex gap-2 flex-wrap">
+                                {colors.map((color) => (
+                                    <button
+                                        key={color.value}
+                                        onClick={(e) => { e.stopPropagation(); setTempColor(color.value); }}
+                                        className={`w-8 h-8 rounded-full border-2 transition-transform hover:scale-110 ${tempColor === color.value ? 'border-white scale-110' : 'border-transparent'}`}
+                                        style={{ backgroundColor: color.value }}
+                                        title={color.name}
+                                    />
+                                ))}
+                            </div>
+                        </div>
+
+                        <div className="mb-6">
+                            <label className="block text-xs text-gray-400 mb-2 flex items-center gap-2">
+                                <Sun size={14} />
+                                Brightness
+                            </label>
+                            <input
+                                type="range"
+                                min="0"
+                                max="1"
+                                step="0.05"
+                                value={brightness}
+                                onChange={handleBrightnessChange}
+                                onClick={(e) => e.stopPropagation()}
+                                className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-blue-500"
+                            />
                         </div>
                         <div className="flex justify-end gap-2">
                             <button
