@@ -81,6 +81,9 @@ class MAHMReader:
                     
             return None
 
+        except Exception:
+            return None
+
     def read_gpu_stats(self):
         if not self.map_file:
             if not self.connect():

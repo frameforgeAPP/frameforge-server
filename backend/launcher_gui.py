@@ -17,9 +17,12 @@ import winerror
 from tkinter import messagebox
 import monitor_server
 import json
+import qrcode
+from PIL import ImageTk
+import socketio
 
 # Configuration
-APP_NAME = "FPS Monitor Server"
+APP_NAME = "FPS Monitor PC"
 DEFAULT_PORT = 8000
 CONFIG_FILE = "launcher_config.txt"
 
@@ -34,12 +37,25 @@ class ServerLauncher(ctk.CTk):
         super().__init__()
 
         self.title(APP_NAME)
-        self.geometry("400x550")
+        self.geometry("400x700") # Increased height
         self.resizable(False, False)
         
         # Set theme
         ctk.set_appearance_mode("Dark")
-        ctk.set_default_color_theme("blue")
+        ctk.set_default_color_theme("dark-blue") # Base theme
+        
+        # Custom Colors
+        self.colors = {
+            "bg": "#0a0a0a",
+            "panel": "#111827",
+            "primary": "#3b82f6", # Blue
+            "danger": "#ef4444",  # Red
+            "text": "#ffffff",
+            "text_dim": "#6b7280", # Darker gray for dim text
+            "border": "#1f2937"
+        }
+        
+        self.configure(fg_color=self.colors["bg"])
 
         self.server_process = None
         self.is_running = False
@@ -67,44 +83,150 @@ class ServerLauncher(ctk.CTk):
         elif self.config.get("start_minimized", False):
             self.after(500, self.minimize_to_tray)
 
-    def create_widgets(self):
-        # Title
-        self.label_title = ctk.CTkLabel(self, text="FPS Monitor Server", font=("Roboto", 24, "bold"))
-        self.label_title.pack(pady=20)
+        # Socket.IO Client
+        self.sio = socketio.Client()
+        self.setup_socket_events()
 
-        # Status Indicator
-        self.status_frame = ctk.CTkFrame(self, fg_color="transparent")
-        self.status_frame.pack(pady=10)
+    def setup_socket_events(self):
+        @self.sio.event
+        def connect():
+            print("GUI Connected to Server")
+
+        @self.sio.event
+        def disconnect():
+            print("GUI Disconnected from Server")
+
+        @self.sio.event
+        def hardware_update(data):
+            self.update_stats(data)
+
+    def create_widgets(self):
+        # Main Container
+        self.main_frame = ctk.CTkFrame(self, fg_color="transparent")
+        self.main_frame.pack(fill="both", expand=True, padx=20, pady=20)
+
+        # Title / Header
+        self.label_title = ctk.CTkLabel(
+            self.main_frame, 
+            text="FPS MONITOR PC", 
+            font=("Arial Black", 24), # Smaller title
+            text_color=self.colors["text"]
+        )
+        self.label_title.pack(pady=(0, 2))
         
-        self.status_indicator = ctk.CTkLabel(self.status_frame, text="●", font=("Arial", 24), text_color="red")
-        self.status_indicator.pack(side="left", padx=5)
+        self.label_subtitle = ctk.CTkLabel(
+            self.main_frame, 
+            text="SERVER CONTROL", 
+            font=("Arial", 10, "bold"), # Smaller subtitle
+            text_color=self.colors["primary"]
+        )
+        self.label_subtitle.pack(pady=(0, 20))
+
+        # Status Panel
+        self.status_frame = ctk.CTkFrame(self.main_frame, fg_color=self.colors["panel"], border_width=1, border_color=self.colors["border"], corner_radius=10)
+        self.status_frame.pack(fill="x", pady=(0, 15), ipady=5)
         
-        self.status_label = ctk.CTkLabel(self.status_frame, text="Stopped", font=("Roboto", 16))
+        self.status_indicator = ctk.CTkLabel(self.status_frame, text="●", font=("Arial", 18), text_color=self.colors["danger"])
+        self.status_indicator.pack(side="left", padx=(15, 8))
+        
+        self.status_label = ctk.CTkLabel(self.status_frame, text="STOPPED", font=("Arial", 12, "bold"), text_color=self.colors["text_dim"])
         self.status_label.pack(side="left")
 
-        # IP Address
-        self.ip_label = ctk.CTkLabel(self, text=f"IP Address: {self.get_local_ip()}", font=("Roboto", 14))
-        self.ip_label.pack(pady=5)
+        # Network Info
+        self.info_frame = ctk.CTkFrame(self.main_frame, fg_color="transparent")
+        self.info_frame.pack(fill="x", pady=(0, 15))
         
-        self.port_label = ctk.CTkLabel(self, text=f"Port: {DEFAULT_PORT}", font=("Roboto", 14))
-        self.port_label.pack(pady=5)
+        # Minimalist IP/Port
+        self.ip_label = ctk.CTkLabel(self.info_frame, text=f"{self.get_local_ip()}", font=("Consolas", 12), text_color=self.colors["text_dim"])
+        self.ip_label.pack()
+        
+        self.port_label = ctk.CTkLabel(self.info_frame, text=f":{DEFAULT_PORT}", font=("Consolas", 12), text_color=self.colors["text_dim"])
+        self.port_label.pack()
+
+        # Monitoring Stats (Hidden by default, shown when running)
+        self.stats_frame = ctk.CTkFrame(self.main_frame, fg_color="transparent") # Transparent bg for minimalism
+        # self.stats_frame.pack(fill="x", pady=(0, 20)) # Packed in toggle_server
+
+        # Stats Grid (Horizontal)
+        self.stats_grid = ctk.CTkFrame(self.stats_frame, fg_color="transparent")
+        self.stats_grid.pack(fill="x", expand=True)
+        
+        # CPU
+        self.cpu_frame = ctk.CTkFrame(self.stats_grid, fg_color=self.colors["panel"], corner_radius=8)
+        self.cpu_frame.pack(side="left", fill="x", expand=True, padx=2)
+        ctk.CTkLabel(self.cpu_frame, text="CPU", font=("Arial", 8, "bold"), text_color=self.colors["text_dim"]).pack(pady=(2,0))
+        self.cpu_label = ctk.CTkLabel(self.cpu_frame, text="--%", font=("Consolas", 12, "bold"), text_color=self.colors["text"])
+        self.cpu_label.pack(pady=(0,2))
+
+        # GPU
+        self.gpu_frame = ctk.CTkFrame(self.stats_grid, fg_color=self.colors["panel"], corner_radius=8)
+        self.gpu_frame.pack(side="left", fill="x", expand=True, padx=2)
+        ctk.CTkLabel(self.gpu_frame, text="GPU", font=("Arial", 8, "bold"), text_color=self.colors["text_dim"]).pack(pady=(2,0))
+        self.gpu_label = ctk.CTkLabel(self.gpu_frame, text="--%", font=("Consolas", 12, "bold"), text_color=self.colors["text"])
+        self.gpu_label.pack(pady=(0,2))
+
+        # RAM
+        self.ram_frame = ctk.CTkFrame(self.stats_grid, fg_color=self.colors["panel"], corner_radius=8)
+        self.ram_frame.pack(side="left", fill="x", expand=True, padx=2)
+        ctk.CTkLabel(self.ram_frame, text="RAM", font=("Arial", 8, "bold"), text_color=self.colors["text_dim"]).pack(pady=(2,0))
+        self.ram_label = ctk.CTkLabel(self.ram_frame, text="--%", font=("Consolas", 12, "bold"), text_color=self.colors["text"])
+        self.ram_label.pack(pady=(0,2))
 
         # Start/Stop Button
-        self.action_button = ctk.CTkButton(self, text="Start Server", command=self.toggle_server, height=40, font=("Roboto", 16, "bold"))
-        self.action_button.pack(pady=20, padx=40, fill="x")
+        self.action_button = ctk.CTkButton(
+            self.main_frame, 
+            text="START SERVER", 
+            command=self.toggle_server, 
+            height=50, 
+            font=("Arial", 16, "bold"),
+            fg_color=self.colors["primary"],
+            hover_color="#2563eb",
+            corner_radius=25
+        )
+        self.action_button.pack(fill="x", pady=(0, 20))
 
-        # Start with Windows
+        # Options
+        self.options_frame = ctk.CTkFrame(self.main_frame, fg_color="transparent")
+        self.options_frame.pack(pady=(0, 20))
+
         self.autostart_var = ctk.BooleanVar(value=self.check_autostart())
-        self.autostart_checkbox = ctk.CTkCheckBox(self, text="Start with Windows", variable=self.autostart_var, command=self.toggle_autostart)
-        self.autostart_checkbox.pack(pady=5)
+        self.autostart_checkbox = ctk.CTkCheckBox(
+            self.options_frame, 
+            text="Start with Windows", 
+            variable=self.autostart_var, 
+            command=self.toggle_autostart,
+            fg_color=self.colors["primary"],
+            hover_color=self.colors["primary"],
+            text_color=self.colors["text_dim"],
+            font=("Arial", 12)
+        )
+        self.autostart_checkbox.pack(anchor="w", pady=5)
 
-        # Start Minimized
-        self.minimized_var = ctk.BooleanVar(value=self.config.get("start_minimized", True))
-        self.minimized_checkbox = ctk.CTkCheckBox(self, text="Start Minimized", variable=self.minimized_var, command=self.toggle_minimized)
-        self.minimized_checkbox.pack(pady=5)
+        self.minimized_var = ctk.BooleanVar(value=self.config.get("start_minimized", False))
+        self.minimized_checkbox = ctk.CTkCheckBox(
+            self.options_frame, 
+            text="Start Minimized", 
+            variable=self.minimized_var, 
+            command=self.toggle_minimized,
+            fg_color=self.colors["primary"],
+            hover_color=self.colors["primary"],
+            text_color=self.colors["text_dim"],
+            font=("Arial", 12)
+        )
+        self.minimized_checkbox.pack(anchor="w", pady=5)
 
-        # Minimize to Tray Info
-        ctk.CTkLabel(self, text="Close window to minimize to tray", text_color="gray", font=("Roboto", 10)).pack(side="bottom", pady=10)
+        # QR Code Container (Hidden by default)
+        self.qr_frame = ctk.CTkFrame(self.main_frame, fg_color="transparent")
+        self.qr_frame.pack(pady=10, expand=True)
+        
+        self.qr_label = ctk.CTkLabel(self.qr_frame, text="")
+        self.qr_label.pack()
+        
+        self.scan_label = ctk.CTkLabel(self.qr_frame, text="SCAN TO CONNECT", font=("Arial", 10, "bold"), text_color=self.colors["text_dim"])
+        # Only pack scan label when QR is shown
+
+        # Footer
+        ctk.CTkLabel(self, text="v1.0.0 • Antigravity", text_color="#4b5563", font=("Arial", 10)).pack(side="bottom", pady=10)
 
     def get_local_ip(self):
         try:
@@ -115,6 +237,29 @@ class ServerLauncher(ctk.CTk):
             return ip
         except:
             return "127.0.0.1"
+
+    def show_qr_code(self):
+        try:
+            ip = self.get_local_ip()
+            port = DEFAULT_PORT
+            url = f"http://{ip}:{port}"
+            
+            # Generate QR
+            qr = qrcode.QRCode(box_size=4, border=2)
+            qr.add_data(url)
+            qr.make(fit=True)
+            img = qr.make_image(fill_color="black", back_color="white")
+            
+            # Convert to RGB (Crucial for CTkImage compatibility)
+            img = img.convert("RGB")
+            
+            # Convert to CTkImage - Reduced size to prevent cropping
+            ctk_img = ctk.CTkImage(light_image=img, dark_image=img, size=(140, 140))
+            
+            self.qr_label.configure(image=ctk_img)
+            self.qr_label.image = ctk_img # Keep reference
+        except Exception as e:
+            messagebox.showerror("QR Error", f"Failed to generate QR: {e}")
 
     def toggle_server(self):
         if self.is_running:
@@ -149,12 +294,59 @@ class ServerLauncher(ctk.CTk):
             )
             
             self.is_running = True
-            self.status_indicator.configure(text_color="green")
-            self.status_label.configure(text="Running")
-            self.action_button.configure(text="Stop Server", fg_color="red", hover_color="darkred")
+            self.status_indicator.configure(text_color=self.colors["primary"]) # Green/Blue
+            self.status_label.configure(text="RUNNING", text_color=self.colors["text"])
+            self.action_button.configure(text="STOP SERVER", fg_color=self.colors["danger"], hover_color="#dc2626")
+            
+            # Show QR Code
+            self.show_qr_code()
+            self.scan_label.pack(pady=(5,0))
+            
+            # Show Stats
+            self.stats_frame.pack(fill="x", pady=(0, 20), after=self.info_frame)
+
+            # Connect Socket (Delayed to ensure server is up)
+            self.after(2000, self.connect_socket)
             
         except Exception as e:
             self.status_label.configure(text=f"Error: {str(e)}", text_color="red")
+
+    def connect_socket(self):
+        if not self.sio.connected:
+            try:
+                self.sio.connect(f'http://localhost:{DEFAULT_PORT}')
+            except Exception as e:
+                print(f"Socket connection failed: {e}")
+
+    def update_stats(self, data):
+        # Update UI in main thread
+        try:
+            # CPU
+            cpu_load = data['cpu']['load']
+            cpu_temp = data['cpu']['temp']
+            self.cpu_label.configure(text=f"{cpu_load}%")
+            
+            # GPU
+            if data['gpus']:
+                gpu = data['gpus'][0]
+                self.gpu_label.configure(text=f"{gpu['load']:.0f}%")
+            
+            # RAM
+            ram_percent = data['ram']['percent']
+            self.ram_label.configure(text=f"{ram_percent}%")
+            
+            # Client Count
+            client_count = data.get('client_count', 0)
+            # Subtract 1 because the GUI itself is a client
+            real_clients = max(0, client_count - 1)
+            
+            if real_clients > 0:
+                self.status_label.configure(text=f"RUNNING • {real_clients} Device(s)")
+            else:
+                self.status_label.configure(text="RUNNING • Waiting...")
+                
+        except Exception as e:
+            print(f"Error updating UI: {e}")
 
     def stop_server(self):
         if self.server_process:
@@ -162,12 +354,24 @@ class ServerLauncher(ctk.CTk):
             self.server_process = None
         
         self.is_running = False
-        self.status_indicator.configure(text_color="red")
-        self.status_label.configure(text="Stopped")
-        self.action_button.configure(text="Start Server", fg_color=["#3B8ED0", "#1F6AA5"], hover_color=["#36719F", "#144870"])
+        self.status_indicator.configure(text_color=self.colors["danger"])
+        self.status_label.configure(text="STOPPED", text_color=self.colors["text_dim"])
+        self.action_button.configure(text="START SERVER", fg_color=self.colors["primary"], hover_color="#2563eb")
+        
+        # Hide QR Code
+        self.qr_label.configure(image=None)
+        self.qr_label.image = None
+        self.scan_label.pack_forget()
+        
+        # Hide Stats
+        self.stats_frame.pack_forget()
+        
+        # Disconnect Socket
+        if self.sio.connected:
+            self.sio.disconnect()
 
     def load_config(self):
-        default_config = {"start_minimized": True}
+        default_config = {"start_minimized": False}
         if os.path.exists(CONFIG_FILE):
             try:
                 with open(CONFIG_FILE, "r") as f:
@@ -244,13 +448,21 @@ class ServerLauncher(ctk.CTk):
         threading.Thread(target=self.tray_icon.run, daemon=True).start()
 
     def create_tray_icon(self):
-        # Create a simple icon
-        width = 64
-        height = 64
-        image = Image.new('RGB', (width, height), color=(59, 142, 208))
-        dc = ImageDraw.Draw(image)
-        dc.rectangle((16, 16, 48, 48), fill='white')
-        return image
+        # Load icon.ico if available, else fallback
+        icon_path = "icon.ico"
+        if getattr(sys, 'frozen', False):
+             icon_path = os.path.join(sys._MEIPASS, "icon.ico") if hasattr(sys, '_MEIPASS') else "icon.ico"
+        
+        if os.path.exists(icon_path):
+            return Image.open(icon_path)
+        else:
+            # Create a simple icon fallback
+            width = 64
+            height = 64
+            image = Image.new('RGB', (width, height), color=(59, 142, 208))
+            dc = ImageDraw.Draw(image)
+            dc.rectangle((16, 16, 48, 48), fill='white')
+            return image
 
     def show_window(self, icon=None, item=None):
         self.deiconify()

@@ -1,24 +1,45 @@
 import React, { useState, useEffect } from 'react';
-import { Cpu, CircuitBoard, HardDrive, MonitorPlay, Maximize, Minimize, Clock as ClockIcon, Circle } from 'lucide-react';
+import { Cpu, CircuitBoard, HardDrive, MonitorPlay, Maximize, Minimize, Clock as ClockIcon, Circle, Smartphone, X, Heart, Palette } from 'lucide-react';
 import { LineChart, Line, ResponsiveContainer, YAxis } from 'recharts';
 import { ScreenBrightness } from '@capacitor-community/screen-brightness';
-import Clock from './Clock';
+import QRCode from 'react-qr-code';
 import GameSummary from './GameSummary';
+import DonationModal from './DonationModal';
+import ThemeSelector from './ThemeSelector';
+import { themes } from '../utils/themes';
 
-export default function Dashboard({ data, toggleFullScreen, isFullscreen, connected, serverAddress, setServerAddress }) {
+export default function Dashboard({ data, toggleFullScreen, isFullscreen, connected, serverAddress, setServerAddress, isDemo }) {
     // Initialize viewMode from localStorage or default to 'default'
     const [viewMode, setViewMode] = useState(() => {
         return localStorage.getItem('dashboardViewMode') || 'default';
     });
     const [history, setHistory] = useState([]);
-    const [showClock, setShowClock] = useState(false);
     const [isRecording, setIsRecording] = useState(false);
+    const [showConnectModal, setShowConnectModal] = useState(false);
+    const [showDonationModal, setShowDonationModal] = useState(false);
+    const [showThemeSelector, setShowThemeSelector] = useState(false);
+    const [currentTheme, setCurrentTheme] = useState(() => {
+        return localStorage.getItem('dashboardTheme') || 'default';
+    });
+    const [localIp, setLocalIp] = useState("");
+
+    const theme = themes[currentTheme] || themes.default;
 
     // Performance Analyzer State
     const [recordingSession, setRecordingSession] = useState([]);
     const [summaryData, setSummaryData] = useState(null);
     const [showSummary, setShowSummary] = useState(false);
     const [lastGameName, setLastGameName] = useState("");
+
+    // Fetch Local IP for QR Code
+    useEffect(() => {
+        if (showConnectModal) {
+            fetch('/api/ip')
+                .then(res => res.json())
+                .then(data => setLocalIp(data.ip))
+                .catch(err => console.error("Failed to fetch IP", err));
+        }
+    }, [showConnectModal]);
 
     // Update History & Data Logic
     useEffect(() => {
@@ -119,18 +140,6 @@ export default function Dashboard({ data, toggleFullScreen, isFullscreen, connec
         return () => clearInterval(interval);
     }, []);
 
-    if (!connected) {
-        return <Clock toggleFullScreen={toggleFullScreen} serverAddress={serverAddress} setServerAddress={setServerAddress} />;
-    }
-
-    if (showClock) {
-        return <Clock toggleFullScreen={toggleFullScreen} serverAddress={serverAddress} setServerAddress={setServerAddress} onDismiss={() => setShowClock(false)} />;
-    }
-
-    if (showSummary && summaryData) {
-        return <GameSummary data={summaryData} onClose={() => setShowSummary(false)} />;
-    }
-
     if (!data) return (
         <div className="flex items-center justify-center h-screen bg-gray-900 text-gray-500 font-mono">
             <div className="text-xl animate-pulse">INITIALIZING SYSTEM...</div>
@@ -169,26 +178,31 @@ export default function Dashboard({ data, toggleFullScreen, isFullscreen, connec
         localStorage.setItem('dashboardViewMode', newMode);
     };
 
-    return (
-        <div className={`h-screen w-screen flex bg-[#0a0a0a] text-white overflow-hidden font-sans selection:bg-orange-500 selection:text-black relative transition-all duration-500 ${isDanger ? 'border-4 border-red-600 shadow-[inset_0_0_50px_rgba(220,38,38,0.5)]' : ''}`}>
+    const handleThemeChange = (newTheme) => {
+        setCurrentTheme(newTheme);
+        localStorage.setItem('dashboardTheme', newTheme);
+        setShowThemeSelector(false);
+    };
 
-            {/* Fullscreen Toggle (Top Right) - REMOVED */
-            /* <button
-                onClick={toggleFullScreen}
-                className="absolute top-4 right-4 z-50 p-2 bg-gray-800 rounded-full text-white hover:bg-gray-700 transition-colors opacity-50 hover:opacity-100"
-            >
-                {isFullscreen ? <Minimize size={20} /> : <Maximize size={20} />}
-            </button> */}
+    return (
+        <div className={`h-screen w-screen flex ${theme.colors.bg} ${theme.colors.text} overflow-hidden font-sans selection:bg-orange-500 selection:text-black relative transition-all duration-500 ${isDanger ? 'border-4 border-red-600 shadow-[inset_0_0_50px_rgba(220,38,38,0.5)]' : ''}`}>
+
+            {/* Demo Mode Indicator */}
+            {isDemo && (
+                <div className="absolute top-4 right-4 z-50 bg-purple-600/20 border border-purple-500/50 text-purple-400 px-3 py-1 rounded-full text-xs font-bold tracking-widest animate-pulse pointer-events-none">
+                    DEMO MODE
+                </div>
+            )}
 
             {/* LEFT SIDEBAR BUTTONS */}
             <div className="absolute left-4 top-1/2 -translate-y-1/2 z-50 flex flex-col gap-4">
-                {/* Clock Button */}
+                {/* Connect Mobile Button */}
                 <button
-                    onClick={() => setShowClock(true)}
+                    onClick={() => setShowConnectModal(true)}
                     className="p-3 bg-gray-800/50 hover:bg-gray-700/80 rounded-full text-gray-400 hover:text-white transition-all backdrop-blur-sm border border-gray-700/50"
-                    title="Screensaver"
+                    title="Connect Mobile"
                 >
-                    <ClockIcon size={24} />
+                    <Smartphone size={24} />
                 </button>
 
                 {/* Record Button */}
@@ -202,17 +216,69 @@ export default function Dashboard({ data, toggleFullScreen, isFullscreen, connec
                 >
                     <Circle size={24} fill={isRecording ? "currentColor" : "none"} />
                 </button>
+
+                {/* Donation Button */}
+                <button
+                    onClick={() => setShowDonationModal(true)}
+                    className="p-3 bg-gray-800/50 hover:bg-gray-700/80 rounded-full text-red-400 hover:text-red-500 transition-all backdrop-blur-sm border border-gray-700/50 group"
+                    title="Support Us"
+                >
+                    <Heart size={24} className="group-hover:scale-110 transition-transform" />
+                </button>
+
+                {/* Theme Button */}
+                <button
+                    onClick={() => setShowThemeSelector(true)}
+                    className="p-3 bg-gray-800/50 hover:bg-gray-700/80 rounded-full text-blue-400 hover:text-blue-500 transition-all backdrop-blur-sm border border-gray-700/50 group"
+                    title="Change Theme"
+                >
+                    <Palette size={24} className="group-hover:scale-110 transition-transform" />
+                </button>
             </div>
+
+            {/* CONNECT MOBILE MODAL */}
+            {showConnectModal && (
+                <div className="absolute inset-0 z-[100] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setShowConnectModal(false)}>
+                    <div className="bg-gray-900 border border-gray-700 rounded-2xl p-8 max-w-sm w-full flex flex-col items-center shadow-2xl" onClick={e => e.stopPropagation()}>
+                        <div className="flex justify-between w-full items-center mb-6">
+                            <h2 className="text-xl font-bold text-white">Connect Mobile</h2>
+                            <button onClick={() => setShowConnectModal(false)} className="text-gray-400 hover:text-white">
+                                <X size={24} />
+                            </button>
+                        </div>
+
+                        <div className="bg-white p-4 rounded-xl mb-6">
+                            {localIp ? (
+                                <QRCode
+                                    value={`http://${localIp}:8000`}
+                                    size={200}
+                                />
+                            ) : (
+                                <div className="w-[200px] h-[200px] flex items-center justify-center text-black">
+                                    Loading IP...
+                                </div>
+                            )}
+                        </div>
+
+                        <p className="text-gray-400 text-center text-sm mb-2">
+                            Scan this code with the Antigravity app on your phone.
+                        </p>
+                        <p className="text-blue-400 font-mono text-xs bg-blue-900/20 px-3 py-1 rounded-full">
+                            {localIp ? `http://${localIp}:8000` : "Detecting..."}
+                        </p>
+                    </div>
+                </div>
+            )}
 
             {/* LEFT PANEL: FPS (Green Focus) */}
             <div
                 onDoubleClick={() => toggleView('fps')}
                 className={`h-full relative flex flex-col items-center justify-center transition-all duration-500 ease-in-out cursor-pointer select-none
-                    ${viewMode === 'fps' ? 'w-full bg-black border-none' : viewMode === 'stats' ? 'hidden' : 'w-[45%] bg-gray-900 border-r-4 border-gray-800'}`}
+                    ${viewMode === 'fps' ? 'w-full bg-black border-none' : viewMode === 'stats' ? 'hidden' : `w-[45%] ${theme.colors.panelBg} border-r-4 ${theme.colors.border}`}`}
             >
                 {/* Background Grid */}
                 <div className="absolute inset-0 opacity-20" style={{
-                    backgroundImage: 'linear-gradient(rgba(255,255,255,0.1) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.1) 1px, transparent 1px)',
+                    backgroundImage: `linear-gradient(${theme.colors.grid} 1px, transparent 1px), linear-gradient(90deg, ${theme.colors.grid} 1px, transparent 1px)`,
                     backgroundSize: viewMode === 'fps' ? '100px 100px' : '40px 40px',
                     opacity: viewMode === 'fps' ? 0.05 : 0.2
                 }}></div>
@@ -253,7 +319,7 @@ export default function Dashboard({ data, toggleFullScreen, isFullscreen, connec
             {/* RIGHT PANEL: STATS (Blue Focus) */}
             <div
                 onDoubleClick={() => toggleView('stats')}
-                className={`h-full p-4 bg-black flex flex-col justify-between gap-3 transition-all duration-500 cursor-pointer select-none
+                className={`h-full p-4 ${theme.colors.bg} flex flex-col justify-between gap-3 transition-all duration-500 cursor-pointer select-none
                     ${viewMode === 'stats' ? 'w-full items-center justify-center' : viewMode === 'fps' ? 'w-0 p-0 overflow-hidden opacity-0' : 'w-[55%] opacity-100'}`}
             >
                 {viewMode === 'stats' ? (
@@ -263,15 +329,15 @@ export default function Dashboard({ data, toggleFullScreen, isFullscreen, connec
 
                         {/* LEFT: RAM */}
                         <div className="flex flex-col items-center justify-center min-w-[150px]">
-                            <HardDrive className="text-purple-400 mb-4" size={48} />
-                            <span className="text-6xl font-bold text-white tracking-tighter">{Math.floor(ram.used_gb)}</span>
+                            <HardDrive className={`${theme.colors.secondary} mb-4`} size={48} />
+                            <span className={`text-6xl font-bold ${theme.colors.text} tracking-tighter`}>{Math.floor(ram.used_gb)}</span>
                             <span className="text-xl text-gray-500 tracking-widest mt-2">GB RAM</span>
                         </div>
 
                         {/* CENTER: Big Blue FPS & Game Name */}
                         <div className="flex flex-col items-center justify-center">
                             {data.game && (
-                                <div className="text-blue-400 font-bold tracking-[0.2em] text-lg mb-[-2vh] uppercase animate-pulse">
+                                <div className={`${theme.colors.accent} font-bold tracking-[0.2em] text-lg mb-[-2vh] uppercase animate-pulse`}>
                                     {data.game}
                                 </div>
                             )}
@@ -292,7 +358,7 @@ export default function Dashboard({ data, toggleFullScreen, isFullscreen, connec
                             {/* CPU */}
                             <div className="flex flex-col items-center w-48">
                                 <div className="flex items-center gap-2 mb-1">
-                                    <Cpu className={`text-orange-400 ${getPulseClass(cpu.load)}`} size={24} />
+                                    <Cpu className={`${theme.colors.highlight} ${getPulseClass(cpu.load)}`} size={24} />
                                     <span className="text-sm text-gray-500 tracking-widest">CPU</span>
                                 </div>
                                 <span className="text-5xl font-bold mb-2" style={{ color: getCpuColor(cpu.temp) }}>{Math.round(cpu.temp)}°</span>
@@ -313,7 +379,7 @@ export default function Dashboard({ data, toggleFullScreen, isFullscreen, connec
                                 return (
                                     <div key={gpu.id} className="flex flex-col items-center w-48">
                                         <div className="flex items-center gap-2 mb-1">
-                                            <CircuitBoard className={`text-orange-400 ${getPulseClass(gpu.load)}`} size={24} />
+                                            <CircuitBoard className={`${theme.colors.highlight} ${getPulseClass(gpu.load)}`} size={24} />
                                             <span className="text-sm text-gray-500 tracking-widest">GPU</span>
                                         </div>
                                         <div className="flex gap-4 items-baseline mb-2">
@@ -338,19 +404,19 @@ export default function Dashboard({ data, toggleFullScreen, isFullscreen, connec
                     // DEFAULT LAYOUT (Bars)
                     <>
                         {/* RAM MODULE */}
-                        <div className="flex-1 rounded-xl border border-gray-800 p-4 flex flex-col justify-center relative overflow-hidden group hover:border-purple-500/50 transition-all" style={{ backgroundColor: 'rgba(17, 24, 39, 0.4)' }}>
+                        <div className={`flex-1 rounded-xl border ${theme.colors.border} p-4 flex flex-col justify-center relative overflow-hidden group hover:border-purple-500/50 transition-all`} style={{ backgroundColor: 'rgba(17, 24, 39, 0.4)' }}>
                             <div className="flex justify-between items-center mb-2">
-                                <div className="flex items-center gap-2 text-purple-400">
+                                <div className={`flex items-center gap-2 ${theme.colors.secondary}`}>
                                     <HardDrive size={20} />
                                     <span className="font-bold tracking-wider">RAM</span>
                                 </div>
                                 <div className="text-right">
-                                    <span className="text-2xl font-bold text-white">{Math.round(ram.percent)}%</span>
+                                    <span className={`text-2xl font-bold ${theme.colors.text}`}>{Math.round(ram.percent)}%</span>
                                     <span className="text-xs text-gray-500 ml-2">{ram.used_gb}/{ram.total_gb}GB</span>
                                 </div>
                             </div>
                             <div className="w-full bg-gray-800 rounded-full h-3 overflow-hidden">
-                                <div className="h-full shadow-[0_0_10px_rgba(168,85,247,0.5)] transition-all duration-500" style={{ width: `${ram.percent}%`, backgroundColor: '#a855f7' }}></div>
+                                <div className={`h-full shadow-[0_0_10px_rgba(168,85,247,0.5)] transition-all duration-500 ${theme.colors.secondaryBg}`} style={{ width: `${ram.percent}%` }}></div>
                             </div>
                         </div>
 
@@ -358,9 +424,9 @@ export default function Dashboard({ data, toggleFullScreen, isFullscreen, connec
                         {gpus.length > 0 && (() => {
                             const gpu = gpus[0]; // Only show primary GPU
                             return (
-                                <div key={gpu.id} className="flex-1 rounded-xl border border-gray-800 p-4 flex flex-col justify-center relative overflow-hidden group hover:border-orange-500/50 transition-all" style={{ backgroundColor: 'rgba(17, 24, 39, 0.4)' }}>
+                                <div key={gpu.id} className={`flex-1 rounded-xl border ${theme.colors.border} p-4 flex flex-col justify-center relative overflow-hidden group hover:border-orange-500/50 transition-all`} style={{ backgroundColor: 'rgba(17, 24, 39, 0.4)' }}>
                                     <div className="flex justify-between items-center mb-2">
-                                        <div className="flex items-center gap-2 text-orange-400">
+                                        <div className={`flex items-center gap-2 ${theme.colors.highlight}`}>
                                             <CircuitBoard size={20} className={getPulseClass(gpu.load)} />
                                             <span className="font-bold tracking-wider">GPU</span>
                                         </div>
@@ -371,21 +437,21 @@ export default function Dashboard({ data, toggleFullScreen, isFullscreen, connec
                                             </div>
                                             <div className="text-right">
                                                 <span className="text-xs text-gray-500 block">LOAD</span>
-                                                <span className="text-xl font-bold text-white">{gpu.load.toFixed(0)}%</span>
+                                                <span className={`text-xl font-bold ${theme.colors.text}`}>{gpu.load.toFixed(0)}%</span>
                                             </div>
                                         </div>
                                     </div>
                                     <div className="w-full bg-gray-800 rounded-full h-3 overflow-hidden">
-                                        <div className="h-full shadow-[0_0_10px_rgba(249,115,22,0.5)] transition-all duration-500" style={{ width: `${gpu.load}%`, backgroundColor: '#f97316' }}></div>
+                                        <div className={`h-full shadow-[0_0_10px_rgba(249,115,22,0.5)] transition-all duration-500 ${theme.colors.highlightBg}`} style={{ width: `${gpu.load}%` }}></div>
                                     </div>
                                 </div>
                             );
                         })()}
 
                         {/* CPU MODULE */}
-                        <div className="flex-1 rounded-xl border border-gray-800 p-4 flex flex-col justify-center relative overflow-hidden group hover:border-red-500/50 transition-all" style={{ backgroundColor: 'rgba(17, 24, 39, 0.4)' }}>
+                        <div className={`flex-1 rounded-xl border ${theme.colors.border} p-4 flex flex-col justify-center relative overflow-hidden group hover:border-red-500/50 transition-all`} style={{ backgroundColor: 'rgba(17, 24, 39, 0.4)' }}>
                             <div className="flex justify-between items-center mb-2">
-                                <div className="flex items-center gap-2 text-orange-400">
+                                <div className={`flex items-center gap-2 ${theme.colors.highlight}`}>
                                     <Cpu size={20} className={getPulseClass(cpu.load)} />
                                     <span className="font-bold tracking-wider">CPU</span>
                                 </div>
@@ -407,6 +473,20 @@ export default function Dashboard({ data, toggleFullScreen, isFullscreen, connec
                     </>
                 )}
             </div>
+
+            {/* MODALS */}
+            {showSummary && summaryData && (
+                <GameSummary data={summaryData} onClose={() => setShowSummary(false)} />
+            )}
+
+            {showDonationModal && (
+                <DonationModal onClose={() => setShowDonationModal(false)} />
+            )}
+
+            {showThemeSelector && (
+                <ThemeSelector currentTheme={currentTheme} onSelectTheme={handleThemeChange} onClose={() => setShowThemeSelector(false)} />
+            )}
         </div>
     );
 }
+

@@ -1,1 +1,1 @@
-{"start_minimized": true}
+{"start_minimized": false}

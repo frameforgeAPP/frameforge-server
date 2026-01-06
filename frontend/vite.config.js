@@ -7,7 +7,20 @@ import basicSsl from '@vitejs/plugin-basic-ssl'
 export default defineConfig({
   server: {
     host: true,
-    https: true
+    https: true,
+    proxy: {
+      '/api': {
+        target: 'http://localhost:8000',
+        changeOrigin: true,
+        secure: false,
+      },
+      '/socket.io': {
+        target: 'http://localhost:8000',
+        ws: true,
+        changeOrigin: true,
+        secure: false,
+      }
+    }
   },
   plugins: [
     basicSsl(),

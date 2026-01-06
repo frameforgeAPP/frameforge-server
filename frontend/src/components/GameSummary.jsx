@@ -1,10 +1,16 @@
-import React, { useEffect, useState } from 'react';
-import { Trophy, Clock, Activity, Thermometer, Cpu, CircuitBoard, X } from 'lucide-react';
+import React, { useEffect, useState, useRef } from 'react';
+import { Trophy, Clock, Activity, Thermometer, Cpu, CircuitBoard, X, Share2 } from 'lucide-react';
+import html2canvas from 'html2canvas';
+import { Share } from '@capacitor/share';
 
 export default function GameSummary({ data, onClose }) {
     const [timeLeft, setTimeLeft] = useState(10);
+    const [isPaused, setIsPaused] = useState(false);
+    const cardRef = useRef(null);
 
     useEffect(() => {
+        if (isPaused) return;
+
         const timer = setInterval(() => {
             setTimeLeft((prev) => {
                 if (prev <= 1) {
@@ -17,7 +23,7 @@ export default function GameSummary({ data, onClose }) {
         }, 1000);
 
         return () => clearInterval(timer);
-    }, [onClose]);
+    }, [onClose, isPaused]);
 
     if (!data) return null;
 
@@ -30,19 +36,70 @@ export default function GameSummary({ data, onClose }) {
         return `${hours > 0 ? hours + 'h ' : ''}${minutes}m ${seconds}s`;
     };
 
+    const handleShare = async () => {
+        setIsPaused(true); // Pause timer while sharing
+        if (!cardRef.current) return;
+
+        try {
+            const canvas = await html2canvas(cardRef.current, {
+                backgroundColor: '#000000',
+                scale: 1.5 // Balanced quality/size
+            });
+
+            const image = canvas.toDataURL("image/png");
+
+            // Check if running on Capacitor (Mobile)
+            // Simple check: if Share plugin is available (it usually is in web too but behaves differently)
+            // We'll try the Web Share API first which Capacitor hooks into, or fallback to download
+
+            if (navigator.share) {
+                // Convert dataURL to Blob for sharing
+                const res = await fetch(image);
+                const blob = await res.blob();
+                const file = new File([blob], "session-stats.png", { type: "image/png" });
+
+                if (navigator.canShare && navigator.canShare({ files: [file] })) {
+                    await navigator.share({
+                        files: [file],
+                        title: 'Antigravity Session',
+                        text: `Just finished playing ${gameName} with ${Math.round(avgFps)} FPS!`,
+                    });
+                } else {
+                    // Fallback for PC/Browsers that don't support file sharing
+                    downloadImage(image);
+                }
+            } else {
+                downloadImage(image);
+            }
+
+        } catch (err) {
+            console.error("Share failed:", err);
+            alert("Failed to share image.");
+        } finally {
+            setIsPaused(false);
+        }
+    };
+
+    const downloadImage = (dataUrl) => {
+        const link = document.createElement('a');
+        link.download = `antigravity-${gameName.replace(/\s+/g, '-').toLowerCase()}-${Date.now()}.png`;
+        link.href = dataUrl;
+        link.click();
+    };
+
     return (
         <div className="fixed inset-0 z-[100] bg-black/90 backdrop-blur-md flex items-center justify-center animate-in fade-in duration-300">
-            <div className="w-full max-w-4xl p-8 relative">
+            <div ref={cardRef} className="w-full max-w-4xl p-8 relative bg-black rounded-3xl border border-gray-800 shadow-2xl">
                 {/* Close Button */}
                 <button
                     onClick={onClose}
-                    className="absolute top-0 right-0 p-2 text-gray-500 hover:text-white transition-colors"
+                    className="absolute top-4 right-4 p-2 text-gray-500 hover:text-white transition-colors z-50"
                 >
                     <X size={32} />
                 </button>
 
                 {/* Header */}
-                <div className="text-center mb-12">
+                <div className="text-center mb-12 pt-4">
                     <div className="flex items-center justify-center gap-3 text-yellow-500 mb-2">
                         <Trophy size={32} />
                         <span className="text-xl font-bold tracking-widest uppercase">Session Complete</span>
@@ -57,7 +114,7 @@ export default function GameSummary({ data, onClose }) {
                 </div>
 
                 {/* Stats Grid */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
 
                     {/* FPS Card */}
                     <div className="bg-gray-900/50 border border-gray-800 rounded-2xl p-6 flex flex-col items-center justify-center relative overflow-hidden group">
@@ -95,15 +152,26 @@ export default function GameSummary({ data, onClose }) {
 
                 </div>
 
+                {/* Footer / Share */}
+                <div className="flex justify-center mb-4">
+                    <button
+                        onClick={handleShare}
+                        className="flex items-center gap-2 px-8 py-3 bg-blue-600 hover:bg-blue-500 text-white rounded-full font-bold transition-all hover:scale-105 shadow-lg shadow-blue-900/20"
+                    >
+                        <Share2 size={20} />
+                        Share Session
+                    </button>
+                </div>
+
                 {/* Progress Bar */}
-                <div className="mt-12 w-full bg-gray-800 h-1 rounded-full overflow-hidden">
+                <div className="w-full bg-gray-800 h-1 rounded-full overflow-hidden">
                     <div
                         className="h-full bg-white transition-all duration-1000 ease-linear"
                         style={{ width: `${(timeLeft / 10) * 100}%` }}
                     ></div>
                 </div>
                 <div className="text-center mt-2 text-xs text-gray-600 font-mono">
-                    Closing in {timeLeft}s
+                    {isPaused ? "Paused" : `Closing in ${timeLeft}s`}
                 </div>
 
             </div>

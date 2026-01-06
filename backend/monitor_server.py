@@ -17,6 +17,12 @@ import win32com.client
 from zeroconf import ServiceInfo, Zeroconf
 import socket
 import GPUtil
+import qrcode
+import io
+from colorama import init, Fore, Style
+
+# Initialize colorama
+init()
 
 # Initialize FastAPI
 app = FastAPI()
@@ -50,6 +56,19 @@ if os.path.exists(frontend_dist):
     @app.get("/")
     async def read_index():
         return FileResponse(os.path.join(frontend_dist, "index.html"))
+
+@app.get("/api/ip")
+async def get_local_ip():
+    try:
+        # Connect to an external server (doesn't actually send data) to get the preferred interface IP
+        # This is more reliable than gethostbyname in multi-interface setups
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.connect(("8.8.8.8", 80))
+        ip = s.getsockname()[0]
+        s.close()
+        return {"ip": ip}
+    except Exception:
+        return {"ip": socket.gethostbyname(socket.gethostname())}
 
 
 # Initialize Socket.IO (Async)
@@ -196,6 +215,40 @@ async def broadcast_stats():
                 cpu_temp = await get_cpu_temp()
 
             cpu_freq = psutil.cpu_freq()
+            
+            # RAM Stats
+            ram = psutil.virtual_memory()
+            
+            # GPU Stats
+            gpus = get_gpu_stats()
+            
+            # FPS Stats (from RTSS)
+            fps_data = rtss_reader.read_fps()
+            fps = fps_data.get("fps", 0) if fps_data else 0
+            
+            # Construct Data Object
+            data = {
+                "cpu": {
+                    "load": cpu_percent,
+                    "temp": cpu_temp,
+                    "freq": cpu_freq.current if cpu_freq else 0
+                },
+                "ram": {
+                    "percent": ram.percent,
+                    "used_gb": round(ram.used / (1024**3), 1),
+                    "total_gb": round(ram.total / (1024**3), 1)
+                },
+                "gpus": gpus,
+                "fps": fps,
+                "rtss_connected": fps_data is not None,
+                "game": fps_data.get("game", "") if fps_data else "",
+                "system": {
+                    "hostname": platform.node(),
+                    "os": f"{platform.system()} {platform.release()}"
+                },
+                "client_count": len(connected_clients)
+            }
+
             # Emit data to all connected clients
             await sio.emit('hardware_update', data)
             
@@ -211,15 +264,20 @@ async def startup_event():
     # Start the background task
     asyncio.create_task(broadcast_stats())
 
+# Track connected clients
+connected_clients = set()
+
 @sio.event
 async def connect(sid, environ, auth=None):
     print(f"Client connecting: {sid}")
-    # Always allow connection
+    connected_clients.add(sid)
     return True
 
 @sio.event
 async def disconnect(sid):
     print(f"Client disconnected: {sid}")
+    if sid in connected_clients:
+        connected_clients.remove(sid)
 
     # Run server (HTTP only to avoid Android SSL issues)
     uvicorn.run(
@@ -273,6 +331,42 @@ async def shutdown_event():
         except Exception as e:
             print(f"Error unregistering mDNS: {e}")
 
+def print_welcome_message(host, port):
+    try:
+        # Get local IP if host is 0.0.0.0
+        if host == "0.0.0.0":
+            s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            s.connect(("8.8.8.8", 80))
+            local_ip = s.getsockname()[0]
+            s.close()
+        else:
+            local_ip = host
+
+        url = f"http://{local_ip}:{port}"
+        
+        # Generate QR Code
+        qr = qrcode.QRCode(version=1, box_size=1, border=1)
+        qr.add_data(url)
+        qr.make(fit=True)
+        
+        print(f"\n{Fore.CYAN}{'='*50}{Style.RESET_ALL}")
+        print(f"{Fore.YELLOW}       ANTIGRAVITY SERVER IS RUNNING!       {Style.RESET_ALL}")
+        print(f"{Fore.CYAN}{'='*50}{Style.RESET_ALL}\n")
+        
+        print(f"1. Open your browser on this PC and go to:")
+        print(f"   {Fore.GREEN}{url}{Style.RESET_ALL}\n")
+        
+        print(f"2. Or scan this QR Code with the Mobile App:\n")
+        
+        # Print QR Code to console
+        qr.print_ascii(invert=True)
+        
+        print(f"\n{Fore.CYAN}{'='*50}{Style.RESET_ALL}\n")
+        print(f"Logs:")
+
+    except Exception as e:
+        print(f"Error generating welcome message: {e}")
+
 def run_server():
     # Fix for Uvicorn in noconsole mode (PyInstaller)
     if sys.stdout is None:
@@ -284,6 +378,7 @@ def run_server():
     HOST = os.environ.get("FPS_HOST", "0.0.0.0")
     PORT = int(os.environ.get("FPS_PORT", "8000"))
     
+    print_welcome_message(HOST, PORT)
     print(f"Starting server on {HOST}:{PORT}")
     
     # Run server (HTTP only to avoid Android SSL issues)
