@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Scanner } from '@yudiel/react-qr-scanner';
 import { Wifi, Play, QrCode, Settings, Monitor } from 'lucide-react';
+import { t } from '../utils/i18n';
 
 export default function ConnectionScreen({ onConnect, onDemo, serverAddress, setServerAddress }) {
     const [showScanner, setShowScanner] = useState(false);
@@ -40,7 +41,7 @@ export default function ConnectionScreen({ onConnect, onDemo, serverAddress, set
                     <h1 className="text-4xl font-black tracking-tighter mb-2 bg-gradient-to-r from-blue-400 to-purple-500 bg-clip-text text-transparent">
                         ANTIGRAVITY
                     </h1>
-                    <p className="text-gray-500 text-sm tracking-widest uppercase">Performance Monitor</p>
+                    <p className="text-gray-500 text-sm tracking-widest uppercase">{t('performance_monitor')}</p>
                 </div>
 
                 {showScanner ? (
@@ -56,7 +57,7 @@ export default function ConnectionScreen({ onConnect, onDemo, serverAddress, set
                             onClick={() => setShowScanner(false)}
                             className="text-gray-400 hover:text-white text-sm"
                         >
-                            Cancel Scanning
+                            {t('cancel_scanning')}
                         </button>
                     </div>
                 ) : (
@@ -67,7 +68,7 @@ export default function ConnectionScreen({ onConnect, onDemo, serverAddress, set
                             className="group relative flex items-center justify-center gap-3 p-4 bg-blue-600 hover:bg-blue-500 rounded-xl transition-all hover:scale-[1.02] active:scale-[0.98] shadow-lg shadow-blue-900/20"
                         >
                             <QrCode className="w-6 h-6" />
-                            <span className="font-bold">Scan QR Code</span>
+                            <span className="font-bold">{t('scan_qr')}</span>
                             <div className="absolute inset-0 rounded-xl ring-2 ring-white/20 group-hover:ring-white/40 transition-all"></div>
                         </button>
 
@@ -77,7 +78,7 @@ export default function ConnectionScreen({ onConnect, onDemo, serverAddress, set
                             className="flex items-center justify-center gap-3 p-4 bg-gray-800 hover:bg-gray-700 rounded-xl transition-all border border-gray-700"
                         >
                             <Wifi className="w-6 h-6 text-gray-400" />
-                            <span className="font-bold text-gray-200">Manual Connection</span>
+                            <span className="font-bold text-gray-200">{t('manual_connection')}</span>
                         </button>
 
                         {/* Manual IP Input */}
@@ -87,14 +88,14 @@ export default function ConnectionScreen({ onConnect, onDemo, serverAddress, set
                                     type="text"
                                     value={manualIp}
                                     onChange={(e) => setManualIp(e.target.value)}
-                                    placeholder="192.168.1.X:8000"
+                                    placeholder={t('server_ip_placeholder')}
                                     className="w-full bg-black border border-gray-700 rounded-lg p-3 text-white focus:border-blue-500 outline-none mb-3 font-mono text-center"
                                 />
                                 <button
                                     onClick={handleManualConnect}
                                     className="w-full py-2 bg-gray-700 hover:bg-gray-600 rounded-lg font-bold text-sm"
                                 >
-                                    Connect
+                                    {t('connect')}
                                 </button>
                             </div>
                         )}
@@ -107,14 +108,14 @@ export default function ConnectionScreen({ onConnect, onDemo, serverAddress, set
                             className="flex items-center justify-center gap-3 p-4 bg-transparent hover:bg-white/5 rounded-xl transition-all border border-gray-800 hover:border-gray-600 group"
                         >
                             <Play className="w-6 h-6 text-purple-500 group-hover:scale-110 transition-transform" />
-                            <span className="font-bold text-gray-300">Try Demo Mode</span>
+                            <span className="font-bold text-gray-300">{t('try_demo')}</span>
                         </button>
                     </div>
                 )}
             </div>
 
             <div className="absolute bottom-6 text-xs text-gray-600">
-                v1.0.0 • Built for Gamers
+                v1.0.0 • {t('built_for_gamers')}
             </div>
         </div>
     );

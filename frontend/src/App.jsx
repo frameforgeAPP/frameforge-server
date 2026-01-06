@@ -1,10 +1,13 @@
-import { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { Maximize } from 'lucide-react';
 import io from 'socket.io-client';
 import { StatusBar } from '@capacitor/status-bar';
 import Dashboard from './components/Dashboard';
 import ConnectionScreen from './components/ConnectionScreen';
 import { generateMockData } from './utils/mockData';
+
+// Simple Error Boundary Component
+// ErrorBoundary moved to components/ErrorBoundary.jsx
 
 function App() {
   const [data, setData] = useState(null);
@@ -14,12 +17,20 @@ function App() {
 
   // Initialize wantsFullScreen from localStorage
   const [wantsFullScreen, setWantsFullScreen] = useState(() => {
-    return localStorage.getItem('wantsFullScreen') === 'true';
+    try {
+      return localStorage.getItem('wantsFullScreen') === 'true';
+    } catch (e) {
+      return false;
+    }
   });
 
   // Initialize serverAddress from localStorage or default
   const [serverAddress, setServerAddress] = useState(() => {
-    return localStorage.getItem('serverAddress') || `http://192.168.1.110:8000`;
+    try {
+      return localStorage.getItem('serverAddress') || `http://192.168.1.110:8000`;
+    } catch (e) {
+      return `http://192.168.1.110:8000`;
+    }
   });
 
   // Socket Ref to handle disconnects manually
@@ -88,7 +99,11 @@ function App() {
   const handleConnect = (address) => {
     setIsDemo(false);
     setServerAddress(address);
-    localStorage.setItem('serverAddress', address);
+    try {
+      localStorage.setItem('serverAddress', address);
+    } catch (e) {
+      console.error("Failed to save server address", e);
+    }
   };
 
   const handleDemo = () => {
@@ -175,13 +190,17 @@ function App() {
     if (!document.fullscreenElement) {
       document.documentElement.requestFullscreen().catch(err => console.log(err));
       setWantsFullScreen(true);
-      localStorage.setItem('wantsFullScreen', 'true');
+      try {
+        localStorage.setItem('wantsFullScreen', 'true');
+      } catch (e) { }
     } else {
       if (document.exitFullscreen) {
         document.exitFullscreen();
       }
       setWantsFullScreen(false);
-      localStorage.setItem('wantsFullScreen', 'false');
+      try {
+        localStorage.setItem('wantsFullScreen', 'false');
+      } catch (e) { }
     }
   };
 

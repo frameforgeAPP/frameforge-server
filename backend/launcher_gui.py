@@ -226,7 +226,7 @@ class ServerLauncher(ctk.CTk):
         # Only pack scan label when QR is shown
 
         # Footer
-        ctk.CTkLabel(self, text="v1.0.0 • Antigravity", text_color="#4b5563", font=("Arial", 10)).pack(side="bottom", pady=10)
+        ctk.CTkLabel(self, text="v1.0.0 • FPS Monitor", text_color="#4b5563", font=("Arial", 10)).pack(side="bottom", pady=10)
 
     def get_local_ip(self):
         try:
@@ -317,6 +317,8 @@ class ServerLauncher(ctk.CTk):
                 self.sio.connect(f'http://localhost:{DEFAULT_PORT}')
             except Exception as e:
                 print(f"Socket connection failed: {e}")
+                # Retry after 2 seconds
+                self.after(2000, self.connect_socket)
 
     def update_stats(self, data):
         # Update UI in main thread
@@ -448,21 +450,22 @@ class ServerLauncher(ctk.CTk):
         threading.Thread(target=self.tray_icon.run, daemon=True).start()
 
     def create_tray_icon(self):
-        # Load icon.ico if available, else fallback
-        icon_path = "icon.ico"
-        if getattr(sys, 'frozen', False):
-             icon_path = os.path.join(sys._MEIPASS, "icon.ico") if hasattr(sys, '_MEIPASS') else "icon.ico"
-        
-        if os.path.exists(icon_path):
-            return Image.open(icon_path)
-        else:
-            # Create a simple icon fallback
-            width = 64
-            height = 64
-            image = Image.new('RGB', (width, height), color=(59, 142, 208))
-            dc = ImageDraw.Draw(image)
-            dc.rectangle((16, 16, 48, 48), fill='white')
-            return image
+        # Load icon.png or icon.ico if available, else fallback
+        for icon_name in ["icon.png", "icon.ico"]:
+            icon_path = icon_name
+            if getattr(sys, 'frozen', False):
+                 icon_path = os.path.join(sys._MEIPASS, icon_name) if hasattr(sys, '_MEIPASS') else icon_name
+            
+            if os.path.exists(icon_path):
+                return Image.open(icon_path)
+
+        # Create a simple icon fallback
+        width = 64
+        height = 64
+        image = Image.new('RGB', (width, height), color=(59, 142, 208))
+        dc = ImageDraw.Draw(image)
+        dc.rectangle((16, 16, 48, 48), fill='white')
+        return image
 
     def show_window(self, icon=None, item=None):
         self.deiconify()

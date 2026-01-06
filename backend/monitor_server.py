@@ -241,7 +241,7 @@ async def broadcast_stats():
                 "gpus": gpus,
                 "fps": fps,
                 "rtss_connected": fps_data is not None,
-                "game": fps_data.get("game", "") if fps_data else "",
+                "game": fps_data.get("game_name", "") if fps_data else "",
                 "system": {
                     "hostname": platform.node(),
                     "os": f"{platform.system()} {platform.release()}"
@@ -350,7 +350,7 @@ def print_welcome_message(host, port):
         qr.make(fit=True)
         
         print(f"\n{Fore.CYAN}{'='*50}{Style.RESET_ALL}")
-        print(f"{Fore.YELLOW}       ANTIGRAVITY SERVER IS RUNNING!       {Style.RESET_ALL}")
+        print(f"{Fore.YELLOW}       FPS MONITOR SERVER IS RUNNING!       {Style.RESET_ALL}")
         print(f"{Fore.CYAN}{'='*50}{Style.RESET_ALL}\n")
         
         print(f"1. Open your browser on this PC and go to:")

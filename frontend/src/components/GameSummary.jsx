@@ -2,6 +2,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import { Trophy, Clock, Activity, Thermometer, Cpu, CircuitBoard, X, Share2 } from 'lucide-react';
 import html2canvas from 'html2canvas';
 import { Share } from '@capacitor/share';
+import { t } from '../utils/i18n';
 
 export default function GameSummary({ data, onClose }) {
     const [timeLeft, setTimeLeft] = useState(10);
@@ -61,8 +62,8 @@ export default function GameSummary({ data, onClose }) {
                 if (navigator.canShare && navigator.canShare({ files: [file] })) {
                     await navigator.share({
                         files: [file],
-                        title: 'Antigravity Session',
-                        text: `Just finished playing ${gameName} with ${Math.round(avgFps)} FPS!`,
+                        title: t('share_title'),
+                        text: t('share_text', { game: gameName, fps: Math.round(avgFps) }),
                     });
                 } else {
                     // Fallback for PC/Browsers that don't support file sharing
@@ -88,8 +89,8 @@ export default function GameSummary({ data, onClose }) {
     };
 
     return (
-        <div className="fixed inset-0 z-[100] bg-black/90 backdrop-blur-md flex items-center justify-center animate-in fade-in duration-300">
-            <div ref={cardRef} className="w-full max-w-4xl p-8 relative bg-black rounded-3xl border border-gray-800 shadow-2xl">
+        <div className="fixed inset-0 z-[100] bg-black/90 backdrop-blur-md flex items-center justify-center animate-in fade-in duration-300 p-4">
+            <div ref={cardRef} className="w-full max-w-4xl p-6 md:p-8 relative bg-black rounded-3xl border border-gray-800 shadow-2xl max-h-[90vh] overflow-y-auto scrollbar-hide">
                 {/* Close Button */}
                 <button
                     onClick={onClose}
@@ -102,10 +103,10 @@ export default function GameSummary({ data, onClose }) {
                 <div className="text-center mb-12 pt-4">
                     <div className="flex items-center justify-center gap-3 text-yellow-500 mb-2">
                         <Trophy size={32} />
-                        <span className="text-xl font-bold tracking-widest uppercase">Session Complete</span>
+                        <span className="text-xl font-bold tracking-widest uppercase">{t('session_complete')}</span>
                     </div>
                     <h1 className="text-6xl font-black text-white tracking-tighter uppercase italic text-transparent bg-clip-text bg-gradient-to-b from-white to-gray-500">
-                        {gameName || "Unknown Game"}
+                        {gameName || t('unknown_game')}
                     </h1>
                     <div className="flex items-center justify-center gap-2 mt-4 text-gray-400">
                         <Clock size={16} />
@@ -121,10 +122,10 @@ export default function GameSummary({ data, onClose }) {
                         <div className="absolute inset-0 bg-blue-500/5 group-hover:bg-blue-500/10 transition-colors"></div>
                         <Activity className="text-blue-500 mb-4" size={32} />
                         <div className="text-5xl font-black text-white mb-1">{Math.round(avgFps)}</div>
-                        <div className="text-sm text-blue-400 font-bold tracking-widest uppercase mb-4">AVG FPS</div>
+                        <div className="text-sm text-blue-400 font-bold tracking-widest uppercase mb-4">{t('avg_fps')}</div>
                         <div className="flex w-full justify-between px-4 text-xs text-gray-500 font-mono">
-                            <span>MIN: {minFps}</span>
-                            <span>MAX: {maxFps}</span>
+                            <span>{t('min')}: {minFps}</span>
+                            <span>{t('max')}: {maxFps}</span>
                         </div>
                     </div>
 
@@ -133,9 +134,9 @@ export default function GameSummary({ data, onClose }) {
                         <div className="absolute inset-0 bg-orange-500/5 group-hover:bg-orange-500/10 transition-colors"></div>
                         <Cpu className="text-orange-500 mb-4" size={32} />
                         <div className="text-5xl font-black text-white mb-1">{Math.round(avgCpuTemp)}°</div>
-                        <div className="text-sm text-orange-400 font-bold tracking-widest uppercase mb-4">AVG CPU TEMP</div>
+                        <div className="text-sm text-orange-400 font-bold tracking-widest uppercase mb-4">{t('avg_cpu_temp')}</div>
                         <div className="flex w-full justify-center text-xs text-gray-500 font-mono">
-                            <span>PEAK: {Math.round(maxCpuTemp)}°</span>
+                            <span>{t('peak')}: {Math.round(maxCpuTemp)}°</span>
                         </div>
                     </div>
 
@@ -144,9 +145,9 @@ export default function GameSummary({ data, onClose }) {
                         <div className="absolute inset-0 bg-purple-500/5 group-hover:bg-purple-500/10 transition-colors"></div>
                         <CircuitBoard className="text-purple-500 mb-4" size={32} />
                         <div className="text-5xl font-black text-white mb-1">{Math.round(avgGpuTemp)}°</div>
-                        <div className="text-sm text-purple-400 font-bold tracking-widest uppercase mb-4">AVG GPU TEMP</div>
+                        <div className="text-sm text-purple-400 font-bold tracking-widest uppercase mb-4">{t('avg_gpu_temp')}</div>
                         <div className="flex w-full justify-center text-xs text-gray-500 font-mono">
-                            <span>PEAK: {Math.round(maxGpuTemp)}°</span>
+                            <span>{t('peak')}: {Math.round(maxGpuTemp)}°</span>
                         </div>
                     </div>
 
@@ -159,7 +160,7 @@ export default function GameSummary({ data, onClose }) {
                         className="flex items-center gap-2 px-8 py-3 bg-blue-600 hover:bg-blue-500 text-white rounded-full font-bold transition-all hover:scale-105 shadow-lg shadow-blue-900/20"
                     >
                         <Share2 size={20} />
-                        Share Session
+                        {t('share_session')}
                     </button>
                 </div>
 
@@ -171,7 +172,7 @@ export default function GameSummary({ data, onClose }) {
                     ></div>
                 </div>
                 <div className="text-center mt-2 text-xs text-gray-600 font-mono">
-                    {isPaused ? "Paused" : `Closing in ${timeLeft}s`}
+                    {isPaused ? t('paused') : `${t('closing_in')} ${timeLeft}s`}
                 </div>
 
             </div>
