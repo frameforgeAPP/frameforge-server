@@ -6,12 +6,12 @@ import { t } from '../utils/i18n';
 export default function ThemeSelector({ currentTheme, onSelectTheme, onClose }) {
     return (
         <div className="fixed inset-0 z-[100] bg-black/90 backdrop-blur-md flex items-center justify-center p-4" onClick={onClose}>
-            <div className="bg-gray-900 border border-gray-700 rounded-3xl p-8 max-w-2xl w-full relative shadow-2xl" onClick={e => e.stopPropagation()}>
+            <div className="bg-gray-900 border border-gray-700 rounded-3xl p-8 max-w-2xl w-full relative shadow-2xl max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
 
                 {/* Close Button */}
                 <button
                     onClick={onClose}
-                    className="absolute top-4 right-4 text-gray-500 hover:text-white transition-colors"
+                    className="absolute top-4 right-4 text-gray-500 hover:text-white transition-colors z-10"
                 >
                     <X size={24} />
                 </button>
@@ -59,6 +59,12 @@ export default function ThemeSelector({ currentTheme, onSelectTheme, onClose }) 
                                     {isActive && (
                                         <div className="text-xs text-green-400 flex items-center gap-1 mt-1">
                                             <Check size={12} /> {t('active_theme')}
+                                        </div>
+                                    )}
+                                    {/* Custom Theme Hint */}
+                                    {key === 'custom' && (
+                                        <div className="text-[10px] text-blue-400 mt-1 italic">
+                                            {t('long_press_customize') || "Long press elements to edit colors"}
                                         </div>
                                     )}
                                 </div>

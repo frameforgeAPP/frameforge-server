@@ -39,7 +39,7 @@ export default function ConnectionScreen({ onConnect, onDemo, serverAddress, set
             <div className="z-10 w-full max-w-md flex flex-col gap-6">
                 <div className="text-center mb-8">
                     <h1 className="text-4xl font-black tracking-tighter mb-2 bg-gradient-to-r from-blue-400 to-purple-500 bg-clip-text text-transparent">
-                        ANTIGRAVITY
+                        FPS MONITOR RR
                     </h1>
                     <p className="text-gray-500 text-sm tracking-widest uppercase">{t('performance_monitor')}</p>
                 </div>

@@ -225,6 +225,7 @@ function App() {
           serverAddress={serverAddress}
           setServerAddress={setServerAddress}
           isDemo={isDemo}
+          exitDemo={() => setIsDemo(false)}
         />
       )}
     </div>

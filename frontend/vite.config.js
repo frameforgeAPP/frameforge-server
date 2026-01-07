@@ -32,8 +32,8 @@ export default defineConfig({
       },
       includeAssets: ['vite.svg'],
       manifest: {
-        name: 'PC Hardware Monitor',
-        short_name: 'PC Monitor',
+        name: 'FPS MONITOR RR',
+        short_name: 'FPS MONITOR RR',
         description: 'Real-time PC Hardware Monitor',
         theme_color: '#242424',
         background_color: '#242424',

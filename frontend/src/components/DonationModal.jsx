@@ -16,8 +16,8 @@ export default function DonationModal({ onClose }) {
     };
 
     return (
-        <div className="fixed inset-0 z-[100] bg-black/90 backdrop-blur-md flex items-center justify-center animate-in fade-in duration-300 p-4" onClick={onClose}>
-            <div className="bg-gray-900 border border-gray-700 rounded-3xl p-8 max-w-md w-full relative shadow-2xl" onClick={e => e.stopPropagation()}>
+        <div className="fixed inset-0 z-[100] bg-black/90 backdrop-blur-md flex items-center justify-center animate-in fade-in duration-300 p-4 overflow-y-auto" onClick={onClose}>
+            <div className="bg-gray-900 border border-gray-700 rounded-3xl p-8 max-w-md w-full relative shadow-2xl my-auto" onClick={e => e.stopPropagation()}>
 
                 {/* Close Button */}
                 <button

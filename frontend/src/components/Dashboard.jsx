@@ -9,10 +9,11 @@ import DonationModal from './DonationModal';
 import ThemeSelector from './ThemeSelector';
 import MatrixRain from './MatrixRain';
 import ColorPickerModal from './ColorPickerModal';
+import Clock from './Clock';
 import { themes } from '../utils/themes';
 import { t } from '../utils/i18n';
 
-export default function Dashboard({ data, toggleFullScreen, isFullscreen, connected, serverAddress, setServerAddress, isDemo }) {
+export default function Dashboard({ data, toggleFullScreen, isFullscreen, connected, serverAddress, setServerAddress, isDemo, exitDemo }) {
     // Initialize viewMode from localStorage or default to 'default'
     const [viewMode, setViewMode] = useState(() => {
         return localStorage.getItem('dashboardViewMode') || 'default';
@@ -42,6 +43,7 @@ export default function Dashboard({ data, toggleFullScreen, isFullscreen, connec
     });
     const [showColorPicker, setShowColorPicker] = useState(false);
     const [colorPickerTarget, setColorPickerTarget] = useState(null);
+    const [showClock, setShowClock] = useState(false);
 
     const handleLongPress = (target) => {
         if (currentTheme === 'custom') {
@@ -119,18 +121,19 @@ export default function Dashboard({ data, toggleFullScreen, isFullscreen, connec
     useEffect(() => {
         if (!data) return;
 
-        if (data.game && data.game !== lastGameName && !isRecording) {
-            // Game Started
+        // Start Recording if game is detected and not already recording
+        if (data.game && !isRecording) {
             console.log("Game detected:", data.game);
             setLastGameName(data.game);
             setRecordingSession([]);
             setIsRecording(true);
-        } else if (!data.game && isRecording && lastGameName) {
-            // Game Ended
+        }
+        // Stop Recording if game is no longer detected and currently recording
+        else if (!data.game && isRecording) {
             console.log("Game ended");
             setIsRecording(false);
         }
-    }, [data, isRecording, lastGameName]);
+    }, [data, isRecording]);
 
     // Stop Recording & Calculate Stats
     useEffect(() => {
@@ -232,20 +235,55 @@ export default function Dashboard({ data, toggleFullScreen, isFullscreen, connec
     };
 
     return (
-        <div className={`h-screen w-screen flex ${theme.colors.bg} ${theme.colors.text} overflow-hidden font-sans selection:bg-orange-500 selection:text-black relative transition-all duration-500 ${isDanger ? 'border-4 border-red-600 shadow-[inset_0_0_50px_rgba(220,38,38,0.5)]' : ''}`}>
+        <div
+            onContextMenu={(e) => {
+                if (e.target === e.currentTarget) {
+                    e.preventDefault();
+                    handleLongPress('bg');
+                }
+            }}
+            className={`h-screen w-screen flex flex-col md:flex-row ${theme.colors.bg} ${theme.colors.text} overflow-hidden font-sans selection:bg-orange-500 selection:text-black relative transition-all duration-500 ${isDanger ? 'border-4 border-red-600 shadow-[inset_0_0_50px_rgba(220,38,38,0.5)]' : ''}`}
+            style={{ backgroundColor: currentTheme === 'custom' ? customColors.bg : undefined }}
+        >
 
             {/* Matrix Rain Effect */}
             {currentTheme === 'matrix' && <MatrixRain />}
 
-            {/* Demo Mode Indicator */}
-            {isDemo && (
-                <div className="absolute top-4 right-4 z-50 bg-purple-600/20 border border-purple-500/50 text-purple-400 px-3 py-1 rounded-full text-xs font-bold tracking-widest animate-pulse pointer-events-none">
-                    DEMO MODE
-                </div>
-            )}
+            {/* TOP RIGHT SYSTEM ACTIONS (Exit Demo & Exit Fullscreen) */}
+            <div className="absolute top-4 right-4 z-50 flex flex-col items-end gap-2">
+                {/* Demo Mode Indicator */}
+                {isDemo && (
+                    <div className="bg-purple-600/20 border border-purple-500/50 text-purple-400 px-3 py-1 rounded-full text-xs font-bold tracking-widest animate-pulse pointer-events-none mb-1">
+                        DEMO MODE
+                    </div>
+                )}
+
+                {/* Exit Demo Button (Minimalist) */}
+                {isDemo && (
+                    <button
+                        onClick={exitDemo}
+                        className="bg-red-600/80 hover:bg-red-700 text-white p-2 rounded-lg font-bold shadow-lg border border-red-500 transition-transform hover:scale-105 active:scale-95 flex items-center justify-center backdrop-blur-sm"
+                        title={t('exit_demo')}
+                    >
+                        <X size={16} />
+                    </button>
+                )}
+
+                {/* Exit Fullscreen Button (Universal) */}
+                {isFullscreen && (
+                    <button
+                        onClick={(e) => toggleFullScreen(e)}
+                        className="bg-gray-800/80 hover:bg-gray-700 text-gray-200 px-4 py-2 rounded-lg font-bold shadow-lg border border-gray-600 transition-transform hover:scale-105 active:scale-95 flex items-center gap-2 backdrop-blur-sm"
+                        title={t('exit_fullscreen')}
+                    >
+                        <Minimize size={16} />
+                        {t('exit_fullscreen')}
+                    </button>
+                )}
+            </div>
 
             {/* LEFT SIDEBAR BUTTONS */}
-            <div className="absolute left-4 top-1/2 -translate-y-1/2 z-50 flex flex-col gap-4">
+            <div className="absolute left-4 top-1/2 -translate-y-1/2 z-40 flex flex-col gap-4 hidden md:flex">
                 {/* Connect Mobile Button - Only show on Web/PC */}
                 {Capacitor.getPlatform() === 'web' && (
                     <button
@@ -305,19 +343,19 @@ export default function Dashboard({ data, toggleFullScreen, isFullscreen, connec
                 </button>
             </div>
 
-            {/* BACK BUTTON (Visible only in FPS/Stats views) */}
-            {viewMode !== 'default' && (
-                <button
-                    onClick={(e) => {
-                        e.stopPropagation();
-                        toggleView('default');
-                    }}
-                    className="absolute top-4 left-4 z-50 p-3 bg-gray-800/50 hover:bg-gray-700/80 rounded-full text-gray-400 hover:text-white transition-all backdrop-blur-sm border border-gray-700/50 group"
-                    title="Back to Dashboard"
-                >
-                    <ChevronLeft size={24} className="group-hover:-translate-x-1 transition-transform" />
+            {/* MOBILE MENU (Bottom Bar) - Visible only on mobile */}
+            <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-40 flex gap-4 md:hidden bg-gray-900/80 p-2 rounded-full backdrop-blur-md border border-gray-700/50">
+                <button onClick={() => setIsRecording(!isRecording)} className={`p-2 rounded-full ${isRecording ? 'text-red-500' : 'text-gray-400'}`}>
+                    <Circle size={20} fill={isRecording ? "currentColor" : "none"} />
                 </button>
-            )}
+                <button onClick={() => setShowThemeSelector(true)} className="p-2 rounded-full text-blue-400">
+                    <Palette size={20} />
+                </button>
+                <button onClick={() => setIsDarkMode(!isDarkMode)} className="p-2 rounded-full text-yellow-400">
+                    {isDarkMode ? <Sun size={20} /> : <Moon size={20} />}
+                </button>
+            </div>
+
 
             {/* BACK BUTTON (Visible only in FPS/Stats views) */}
             {viewMode !== 'default' && (
@@ -370,8 +408,8 @@ export default function Dashboard({ data, toggleFullScreen, isFullscreen, connec
             {/* LEFT PANEL: FPS (Green Focus) */}
             <div
                 onDoubleClick={() => toggleView('fps')}
-                className={`h-full relative flex flex-col items-center justify-center transition-all duration-500 ease-in-out cursor-pointer select-none
-                    ${viewMode === 'fps' ? 'w-full bg-black border-none' : viewMode === 'stats' ? 'hidden' : `w-[45%] ${theme.colors.panelBg} border-r-4 ${theme.colors.border}`}`}
+                className={`relative flex flex-col items-center justify-center transition-all duration-500 ease-in-out cursor-pointer select-none md:pl-0
+                    ${viewMode === 'fps' ? `w-full h-full ${theme.colors.bg} border-none` : viewMode === 'stats' ? 'hidden' : `w-full h-[40%] md:w-[45%] md:h-full ${theme.colors.panelBg} border-b-4 md:border-b-0 md:border-r-4 ${theme.colors.border}`}`}
             >
                 {/* Background Grid */}
                 <div className="absolute inset-0 opacity-20" style={{
@@ -382,24 +420,33 @@ export default function Dashboard({ data, toggleFullScreen, isFullscreen, connec
 
                 {/* Header - Hidden in Focus Mode */}
                 {viewMode === 'default' && (
-                    <div className="absolute top-4 left-4 flex items-center gap-2 opacity-70 ml-16">
+                    <div className="absolute top-4 left-4 flex items-center gap-2 opacity-70 md:ml-16">
                         <MonitorPlay className="text-green-400 animate-pulse" size={20} />
-                        <span className="text-xs font-bold tracking-[0.2em] text-green-400">FPS // {t('live')}</span>
+                        <MonitorPlay className="text-green-400 animate-pulse" size={20} />
+                        <span className="text-xs font-bold tracking-[0.2em] text-green-400">FPS MONITOR RR</span>
+                        <button
+                            onClick={(e) => { e.stopPropagation(); setShowClock(true); }}
+                            className="ml-2 text-green-400/50 hover:text-green-400 transition-colors"
+                            title={t('open_clock')}
+                        >
+                            <ClockIcon size={16} />
+                        </button>
                     </div>
                 )}
 
-                <div className="z-10 flex flex-col items-center justify-center h-full">
+                <div className="z-10 flex flex-col items-center justify-center h-full md:pl-0">
                     <div
                         className={`font-black leading-none tracking-tighter transition-all duration-500
                             ${viewMode === 'fps'
                                 ? 'text-[35vw]'
-                                : 'text-[8rem] lg:text-[12rem]'
+                                : 'text-[25vw] md:text-[8rem] lg:text-[12rem]'
                             }`}
                         style={{
                             fontFamily: 'Impact, sans-serif',
-                            color: fpsColor,
+                            color: currentTheme === 'custom' && customColors.fps ? customColors.fps : fpsColor,
                             filter: `drop-shadow(0 0 ${viewMode === 'fps' ? '50px' : '25px'} ${fpsColor}66)` // 66 is ~40% opacity
                         }}
+                        onContextMenu={(e) => { e.preventDefault(); handleLongPress('fps'); }}
                     >
                         {fps || 0}
                     </div>
@@ -423,13 +470,13 @@ export default function Dashboard({ data, toggleFullScreen, isFullscreen, connec
             {/* RIGHT PANEL: STATS (Blue Focus) */}
             <div
                 onDoubleClick={() => toggleView('stats')}
-                className={`h-full p-4 ${theme.colors.bg} flex flex-col justify-between gap-3 transition-all duration-500 cursor-pointer select-none
-                    ${viewMode === 'stats' ? 'w-full items-center justify-center' : viewMode === 'fps' ? 'w-0 p-0 overflow-hidden opacity-0' : 'w-[55%] opacity-100'}`}
+                className={`p-4 ${theme.colors.bg} flex flex-col justify-between gap-3 transition-all duration-500 cursor-pointer select-none md:pl-4
+                    ${viewMode === 'stats' ? 'w-full h-full items-center justify-center' : viewMode === 'fps' ? 'w-0 p-0 overflow-hidden opacity-0' : 'w-full h-[60%] md:w-[55%] md:h-full opacity-100'}`}
             >
                 {viewMode === 'stats' ? (
                     // BLUE MODE LAYOUT (Steam Blue #1a9fff)
                     // Layout: RAM (Left) - FPS (Center) - CPU/GPU Stack (Right)
-                    <div className="flex flex-row items-center justify-between w-full h-full px-8 lg:px-16">
+                    <div className="flex flex-col md:flex-row items-center justify-between w-full h-full px-4 md:px-16 gap-8 md:gap-0 overflow-y-auto">
 
                         {/* LEFT: RAM */}
                         <div className="flex flex-col items-center justify-center min-w-[150px]">
@@ -449,9 +496,10 @@ export default function Dashboard({ data, toggleFullScreen, isFullscreen, connec
                                 className="font-black leading-none tracking-tighter text-[35vw]"
                                 style={{
                                     fontFamily: 'Impact, sans-serif',
-                                    color: fpsColor,
+                                    color: currentTheme === 'custom' && customColors.fps ? customColors.fps : fpsColor,
                                     filter: `drop-shadow(0 0 50px ${fpsColor}99)` // 99 is ~60% opacity
                                 }}
+                                onContextMenu={(e) => { e.preventDefault(); handleLongPress('fps'); }}
                             >
                                 {fps || 0}
                             </div>
@@ -630,6 +678,17 @@ export default function Dashboard({ data, toggleFullScreen, isFullscreen, connec
                     onClose={() => setShowColorPicker(false)}
                     title={`Color: ${colorPickerTarget?.toUpperCase()}`}
                 />
+            )}
+
+            {showClock && (
+                <div className="absolute inset-0 z-[100]">
+                    <Clock
+                        toggleFullScreen={toggleFullScreen}
+                        serverAddress={serverAddress}
+                        setServerAddress={setServerAddress}
+                        onDismiss={() => setShowClock(false)}
+                    />
+                </div>
             )}
         </div>
     );

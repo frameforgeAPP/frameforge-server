@@ -115,7 +115,7 @@ export default function GameSummary({ data, onClose }) {
                 </div>
 
                 {/* Stats Grid */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8 overflow-y-auto max-h-[50vh] md:max-h-none p-2">
 
                     {/* FPS Card */}
                     <div className="bg-gray-900/50 border border-gray-800 rounded-2xl p-6 flex flex-col items-center justify-center relative overflow-hidden group">

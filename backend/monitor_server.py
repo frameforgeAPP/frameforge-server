@@ -279,13 +279,6 @@ async def disconnect(sid):
     if sid in connected_clients:
         connected_clients.remove(sid)
 
-    # Run server (HTTP only to avoid Android SSL issues)
-    uvicorn.run(
-        socket_app, 
-        host=HOST, 
-        port=PORT
-    )
-
 # Global Zeroconf instance
 zeroconf = None
 info = None
