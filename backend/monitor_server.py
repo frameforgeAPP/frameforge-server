@@ -57,6 +57,40 @@ if os.path.exists(frontend_dist):
     async def read_index():
         return FileResponse(os.path.join(frontend_dist, "index.html"))
 
+def get_afterburner_status():
+    """
+    Check MSI Afterburner / RTSS status
+    Returns: 'running', 'installed', or 'not-found'
+    """
+    rtss_running = False
+    afterburner_running = False
+    
+    # Check if processes are running
+    for proc in psutil.process_iter(['name']):
+        try:
+            proc_name = proc.info['name']
+            if proc_name and proc_name.lower() == 'rtss.exe':
+                rtss_running = True
+            elif proc_name and proc_name.lower() == 'msiafterburner.exe':
+                afterburner_running = True
+        except (psutil.NoSuchProcess, psutil.AccessDenied):
+            pass
+    
+    # If RTSS is running, verify shared memory is accessible
+    if rtss_running:
+        try:
+            test_reader = RTSSReader()
+            if test_reader.connect():
+                return 'running'
+        except:
+            pass
+    
+    # If processes found but not accessible, it's installed
+    if rtss_running or afterburner_running:
+        return 'installed'
+    
+    return 'not-found'
+
 @app.get("/api/ip")
 async def get_local_ip():
     try:
@@ -69,6 +103,12 @@ async def get_local_ip():
         return {"ip": ip}
     except Exception:
         return {"ip": socket.gethostbyname(socket.gethostname())}
+
+@app.get("/api/afterburner-status")
+async def get_afterburner_status_endpoint():
+    """Endpoint to check Afterburner/RTSS status"""
+    status = get_afterburner_status()
+    return {"status": status}
 
 
 # Initialize Socket.IO (Async)
@@ -242,6 +282,7 @@ async def broadcast_stats():
                 "fps": fps,
                 "rtss_connected": fps_data is not None,
                 "game": fps_data.get("game_name", "") if fps_data else "",
+                "afterburner_status": get_afterburner_status(),
                 "system": {
                     "hostname": platform.node(),
                     "os": f"{platform.system()} {platform.release()}"

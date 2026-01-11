@@ -2,8 +2,10 @@ import React, { useEffect, useState, useRef } from 'react';
 import { Maximize } from 'lucide-react';
 import io from 'socket.io-client';
 import { StatusBar } from '@capacitor/status-bar';
-import Dashboard from './components/Dashboard';
+import DashboardWithModals from './components/DashboardWithModals';
 import ConnectionScreen from './components/ConnectionScreen';
+import SplashScreen from './components/SplashScreen';
+import TutorialOverlay from './components/TutorialOverlay';
 import { generateMockData } from './utils/mockData';
 
 // Simple Error Boundary Component
@@ -14,6 +16,16 @@ function App() {
   const [connected, setConnected] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isDemo, setIsDemo] = useState(false);
+  const [cameFromDashboard, setCameFromDashboard] = useState(false);
+  const [showSplash, setShowSplash] = useState(true);
+  const [showTutorial, setShowTutorial] = useState(false);
+  const [hasShownTutorial, setHasShownTutorial] = useState(() => {
+    try {
+      return localStorage.getItem('fps_monitor_tutorial_seen') === 'true';
+    } catch (e) {
+      return false;
+    }
+  });
 
   // Initialize wantsFullScreen from localStorage
   const [wantsFullScreen, setWantsFullScreen] = useState(() => {
@@ -60,7 +72,19 @@ function App() {
       }
 
       const socket = io(serverAddress, {
-        transports: ['websocket', 'polling']
+        transports: ['websocket', 'polling'],
+        // Reconnection options
+        reconnection: true,
+        reconnectionAttempts: 10,
+        reconnectionDelay: 1000,
+        reconnectionDelayMax: 5000,
+        // Timeout options
+        timeout: 20000,
+        // Force fresh connection (fixes stale connection issues)
+        forceNew: true,
+        // Ping settings
+        pingTimeout: 30000,
+        pingInterval: 10000,
       });
 
       socketRef.current = socket;
@@ -68,6 +92,8 @@ function App() {
       socket.on('connect', () => {
         console.log('Connected to backend');
         setConnected(true);
+        // Request initial data immediately after connection
+        socket.emit('request_data');
       });
 
       socket.on('connect_error', (err) => {
@@ -75,10 +101,20 @@ function App() {
         setConnected(false);
       });
 
-      socket.on('disconnect', () => {
-        console.log('Disconnected from backend');
+      socket.on('disconnect', (reason) => {
+        console.log('Disconnected from backend:', reason);
         setConnected(false);
         setData(null);
+        // If disconnected unexpectedly, socket.io will auto-reconnect
+      });
+
+      socket.on('reconnect', (attemptNumber) => {
+        console.log('Reconnected after', attemptNumber, 'attempts');
+        setConnected(true);
+      });
+
+      socket.on('reconnect_attempt', (attemptNumber) => {
+        console.log('Reconnection attempt', attemptNumber);
       });
 
       socket.on('hardware_update', (newData) => {
@@ -204,20 +240,68 @@ function App() {
     }
   };
 
+  // Handle return to config screen
+  const handleReturnToConfig = () => {
+    if (socketRef.current) socketRef.current.disconnect();
+    setConnected(false);
+    setIsDemo(false);
+    setData(null);
+    setCameFromDashboard(true); // Remember we came from dashboard
+  };
+
+  // Handle quick reconnect from ConnectionScreen
+  const handleReconnect = () => {
+    setCameFromDashboard(false);
+    // Trigger reconnection by re-setting server address
+    const addr = serverAddress;
+    setServerAddress('');
+    setTimeout(() => setServerAddress(addr), 100);
+  };
+
+  // Show tutorial when first connected (and not in demo, and not seen before)
+  useEffect(() => {
+    if (connected && !hasShownTutorial && !isDemo && data) {
+      setTimeout(() => {
+        setShowTutorial(true);
+      }, 1000);
+    }
+  }, [connected, hasShownTutorial, isDemo, data]);
+
+  const handleTutorialComplete = () => {
+    setShowTutorial(false);
+    setHasShownTutorial(true);
+    try {
+      localStorage.setItem('fps_monitor_tutorial_seen', 'true');
+    } catch (e) { }
+  };
+
   return (
     <div
       className="min-h-screen bg-gray-900 text-white"
       onClick={handleGlobalClick}
     >
+      {/* Splash Screen */}
+      {showSplash && (
+        <SplashScreen onComplete={() => setShowSplash(false)} />
+      )}
+
+      {/* Tutorial Overlay */}
+      <TutorialOverlay
+        isOpen={showTutorial}
+        onComplete={handleTutorialComplete}
+      />
+
       {!connected ? (
         <ConnectionScreen
           onConnect={handleConnect}
           onDemo={handleDemo}
           serverAddress={serverAddress}
           setServerAddress={setServerAddress}
+          cameFromDashboard={cameFromDashboard}
+          onReconnect={handleReconnect}
         />
       ) : (
-        <Dashboard
+        <DashboardWithModals
           data={data}
           toggleFullScreen={toggleFullScreen}
           isFullscreen={isFullscreen}
@@ -226,6 +310,7 @@ function App() {
           setServerAddress={setServerAddress}
           isDemo={isDemo}
           exitDemo={() => setIsDemo(false)}
+          onReturnToConfig={handleReturnToConfig}
         />
       )}
     </div>

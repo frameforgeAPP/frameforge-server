@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Cpu, CircuitBoard, HardDrive, MonitorPlay, Maximize, Minimize, Clock as ClockIcon, Circle, Smartphone, X, Heart, Palette, ChevronLeft, Sun, Moon } from 'lucide-react';
+import { Cpu, CircuitBoard, HardDrive, MonitorPlay, Maximize, Minimize, Clock as ClockIcon, Circle, Smartphone, X, Heart, Palette, ChevronLeft, Sun, Moon, Bell, History, Home } from 'lucide-react';
 import { LineChart, Line, ResponsiveContainer, YAxis } from 'recharts';
 import { ScreenBrightness } from '@capacitor-community/screen-brightness';
 import { Capacitor } from '@capacitor/core';
@@ -8,12 +8,19 @@ import GameSummary from './GameSummary';
 import DonationModal from './DonationModal';
 import ThemeSelector from './ThemeSelector';
 import MatrixRain from './MatrixRain';
+import StarsBackground from './StarsBackground';
+import EmbersBackground from './EmbersBackground';
+import RainBackground from './RainBackground';
+import ParticlesBackground from './ParticlesBackground';
+import GradientBackground from './GradientBackground';
+import PulseBackground from './PulseBackground';
 import ColorPickerModal from './ColorPickerModal';
 import Clock from './Clock';
 import { themes } from '../utils/themes';
 import { t } from '../utils/i18n';
+import { getAlertsSettings, triggerVibration, triggerSound } from '../utils/alertsUtils';
 
-export default function Dashboard({ data, toggleFullScreen, isFullscreen, connected, serverAddress, setServerAddress, isDemo, exitDemo }) {
+export default function Dashboard({ data, toggleFullScreen, isFullscreen, connected, serverAddress, setServerAddress, isDemo, exitDemo, onOpenAlerts, onOpenHistory, onReturnToConfig }) {
     // Initialize viewMode from localStorage or default to 'default'
     const [viewMode, setViewMode] = useState(() => {
         return localStorage.getItem('dashboardViewMode') || 'default';
@@ -44,6 +51,39 @@ export default function Dashboard({ data, toggleFullScreen, isFullscreen, connec
     const [showColorPicker, setShowColorPicker] = useState(false);
     const [colorPickerTarget, setColorPickerTarget] = useState(null);
     const [showClock, setShowClock] = useState(false);
+    const [showControls, setShowControls] = useState(false);
+
+    // Background Effects State
+    const [currentBackground, setCurrentBackground] = useState(() => {
+        return localStorage.getItem('dashboardBackground') || 'none';
+    });
+    const [customBackgroundImage, setCustomBackgroundImage] = useState(() => {
+        return localStorage.getItem('dashboardCustomBgImage') || null;
+    });
+    const [globalSettings, setGlobalSettings] = useState(() => {
+        try {
+            const saved = localStorage.getItem('dashboardGlobalSettings');
+            return saved ? JSON.parse(saved) : { accent: '#3b82f6', text: '#ffffff', bg: '#111827' };
+        } catch (e) {
+            return { accent: '#3b82f6', text: '#ffffff', bg: '#111827' };
+        }
+    });
+
+    const handleSelectBackground = (bgId) => {
+        setCurrentBackground(bgId);
+        localStorage.setItem('dashboardBackground', bgId);
+    };
+
+    const handleUploadBackground = (imageData) => {
+        setCustomBackgroundImage(imageData);
+        localStorage.setItem('dashboardCustomBgImage', imageData);
+    };
+
+    const handleUpdateGlobalSettings = (key, value) => {
+        const newSettings = { ...globalSettings, [key]: value };
+        setGlobalSettings(newSettings);
+        localStorage.setItem('dashboardGlobalSettings', JSON.stringify(newSettings));
+    };
 
     const handleLongPress = (target) => {
         if (currentTheme === 'custom') {
@@ -116,6 +156,51 @@ export default function Dashboard({ data, toggleFullScreen, isFullscreen, connec
             }]);
         }
     }, [data, isRecording]);
+
+    // Alerts Checking
+    const [lastAlertTime, setLastAlertTime] = useState(0);
+    useEffect(() => {
+        if (!data) return;
+
+        const alertSettings = getAlertsSettings();
+        if (!alertSettings.enabled) return;
+
+        const now = Date.now();
+        const cooldownMs = (alertSettings.cooldownSeconds || 30) * 1000;
+
+        // Check if we're still in cooldown
+        if (now - lastAlertTime < cooldownMs) return;
+
+        const cpuTemp = data.cpu?.temp || 0;
+        const gpuTemp = data.gpus?.[0]?.temperature || 0;
+        const fps = data.fps || 0;
+
+        let shouldAlert = false;
+
+        // Check thresholds
+        if (cpuTemp > alertSettings.cpuTempLimit) {
+            console.log('Alert: CPU temp exceeded', cpuTemp, '>', alertSettings.cpuTempLimit);
+            shouldAlert = true;
+        }
+        if (gpuTemp > alertSettings.gpuTempLimit) {
+            console.log('Alert: GPU temp exceeded', gpuTemp, '>', alertSettings.gpuTempLimit);
+            shouldAlert = true;
+        }
+        if (fps > 0 && fps < alertSettings.fpsLowLimit) {
+            console.log('Alert: FPS too low', fps, '<', alertSettings.fpsLowLimit);
+            shouldAlert = true;
+        }
+
+        if (shouldAlert) {
+            setLastAlertTime(now);
+            if (alertSettings.vibrate) {
+                triggerVibration([200, 100, 200, 100, 200]);
+            }
+            if (alertSettings.sound) {
+                triggerSound();
+            }
+        }
+    }, [data, lastAlertTime]);
 
     // Automatic Game Detection
     useEffect(() => {
@@ -190,9 +275,53 @@ export default function Dashboard({ data, toggleFullScreen, isFullscreen, connec
         return () => clearInterval(interval);
     }, []);
 
+    // Auto-hide controls after 4 seconds
+    useEffect(() => {
+        if (showControls) {
+            const timer = setTimeout(() => {
+                setShowControls(false);
+            }, 4000);
+            return () => clearTimeout(timer);
+        }
+    }, [showControls]);
+
     if (!data) return (
-        <div className="flex items-center justify-center h-screen bg-gray-900 text-gray-500 font-mono">
-            <div className="text-xl animate-pulse">{t('initializing')}</div>
+        <div className="flex flex-col items-center justify-center h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900">
+            {/* Animated Background Glow */}
+            <div className="absolute inset-0 overflow-hidden">
+                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-cyan-500/20 rounded-full blur-3xl animate-pulse" />
+                <div className="absolute top-1/3 left-1/3 w-64 h-64 bg-purple-500/10 rounded-full blur-2xl animate-pulse" style={{ animationDelay: '1s' }} />
+            </div>
+
+            {/* Logo */}
+            <div className="relative z-10 mb-8">
+                <div className="text-6xl font-black text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 via-blue-500 to-purple-500 tracking-tighter">
+                    FF
+                </div>
+                <div className="absolute -inset-4 bg-cyan-500/20 rounded-full blur-xl animate-pulse" />
+            </div>
+
+            {/* Spinner */}
+            <div className="relative z-10 mb-6">
+                <div className="w-16 h-16 border-4 border-gray-700 border-t-cyan-500 rounded-full animate-spin" />
+            </div>
+
+            {/* Text */}
+            <div className="relative z-10 text-center">
+                <div className="text-xl font-bold text-white mb-2 tracking-widest uppercase">
+                    {t('initializing')}
+                </div>
+                <div className="text-sm text-gray-500 animate-pulse">
+                    {connected ? 'Aguardando dados do servidor...' : 'Conectando ao servidor...'}
+                </div>
+            </div>
+
+            {/* Dots Animation */}
+            <div className="relative z-10 flex gap-2 mt-8">
+                <div className="w-2 h-2 bg-cyan-500 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                <div className="w-2 h-2 bg-cyan-500 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                <div className="w-2 h-2 bg-cyan-500 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+            </div>
         </div>
     );
 
@@ -236,6 +365,14 @@ export default function Dashboard({ data, toggleFullScreen, isFullscreen, connec
 
     return (
         <div
+            onClick={(e) => {
+                // Toggle controls on tap (but not on buttons or modals)
+                const isButton = e.target.closest('button');
+                const isModal = e.target.closest('[class*="modal"]') || e.target.closest('[class*="z-[100]"]');
+                if (!isButton && !isModal) {
+                    setShowControls(prev => !prev);
+                }
+            }}
             onContextMenu={(e) => {
                 if (e.target === e.currentTarget) {
                     e.preventDefault();
@@ -246,8 +383,33 @@ export default function Dashboard({ data, toggleFullScreen, isFullscreen, connec
             style={{ backgroundColor: currentTheme === 'custom' ? customColors.bg : undefined }}
         >
 
-            {/* Matrix Rain Effect */}
-            {currentTheme === 'matrix' && <MatrixRain />}
+            {/* Background Effects */}
+            {(currentBackground === 'matrix' || currentTheme === 'matrix') && <MatrixRain />}
+            {currentBackground === 'stars' && <StarsBackground />}
+            {currentBackground === 'embers' && <EmbersBackground />}
+            {currentBackground === 'rain' && <RainBackground />}
+            {currentBackground === 'particles' && <ParticlesBackground />}
+            {currentBackground === 'gradient' && <GradientBackground />}
+            {currentBackground === 'pulse' && <PulseBackground />}
+            {currentBackground === 'custom' && customBackgroundImage && (
+                <div
+                    className="fixed inset-0 z-0 bg-cover bg-center opacity-30"
+                    style={{ backgroundImage: `url(${customBackgroundImage})` }}
+                />
+            )}
+
+            {/* Server Disconnection Warning */}
+            {!connected && !isDemo && (
+                <div className="absolute top-4 left-1/2 -translate-x-1/2 z-50 animate-pulse">
+                    <div className="bg-red-600/90 backdrop-blur-sm border border-red-500 text-white px-4 py-3 rounded-xl shadow-lg shadow-red-900/50 flex items-center gap-3">
+                        <div className="w-3 h-3 bg-red-300 rounded-full animate-ping" />
+                        <div className="flex flex-col">
+                            <span className="font-bold text-sm">⚠️ Servidor Desconectado</span>
+                            <span className="text-xs text-red-200">Abra o FrameForgeServer.exe no PC</span>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* TOP RIGHT SYSTEM ACTIONS (Exit Demo & Exit Fullscreen) */}
             <div className="absolute top-4 right-4 z-50 flex flex-col items-end gap-2">
@@ -256,17 +418,6 @@ export default function Dashboard({ data, toggleFullScreen, isFullscreen, connec
                     <div className="bg-purple-600/20 border border-purple-500/50 text-purple-400 px-3 py-1 rounded-full text-xs font-bold tracking-widest animate-pulse pointer-events-none mb-1">
                         DEMO MODE
                     </div>
-                )}
-
-                {/* Exit Demo Button (Minimalist) */}
-                {isDemo && (
-                    <button
-                        onClick={exitDemo}
-                        className="bg-red-600/80 hover:bg-red-700 text-white p-2 rounded-lg font-bold shadow-lg border border-red-500 transition-transform hover:scale-105 active:scale-95 flex items-center justify-center backdrop-blur-sm"
-                        title={t('exit_demo')}
-                    >
-                        <X size={16} />
-                    </button>
                 )}
 
                 {/* Exit Fullscreen Button (Universal) */}
@@ -282,47 +433,70 @@ export default function Dashboard({ data, toggleFullScreen, isFullscreen, connec
                 )}
             </div>
 
-            {/* LEFT SIDEBAR BUTTONS */}
-            <div className="absolute left-4 top-1/2 -translate-y-1/2 z-40 flex flex-col gap-4 hidden md:flex">
+            {/* Exit Demo Button - ALWAYS VISIBLE when in demo mode (not affected by showControls) */}
+            {isDemo && onReturnToConfig && (
+                <button
+                    onClick={onReturnToConfig}
+                    className="absolute top-16 right-4 z-50 bg-red-600/90 hover:bg-red-700 text-white px-4 py-2 rounded-lg font-bold shadow-lg border border-red-500 transition-transform hover:scale-105 active:scale-95 flex items-center gap-2 backdrop-blur-sm"
+                    title="Sair do Demo"
+                >
+                    <X size={16} />
+                    <span className="text-sm">Sair Demo</span>
+                </button>
+            )}
+
+            {/* LEFT SIDEBAR BUTTONS - Hidden until tap */}
+            <div className={`absolute left-3 top-1/2 -translate-y-1/2 z-40 flex flex-col gap-2 hidden md:flex transition-all duration-300 ${showControls ? 'opacity-100 translate-x-0' : 'opacity-0 -translate-x-4 pointer-events-none'}`}>
+                {/* Back to Config Button */}
+                {onReturnToConfig && (
+                    <button
+                        onClick={onReturnToConfig}
+                        className="p-2 bg-gray-800/50 hover:bg-gray-700/80 rounded-full text-cyan-400 hover:text-cyan-300 transition-all backdrop-blur-sm border border-cyan-700/50 group"
+                        title="Voltar à Configuração"
+                    >
+                        <Home size={18} className="group-hover:scale-110 transition-transform" />
+                    </button>
+                )}
+
                 {/* Connect Mobile Button - Only show on Web/PC */}
                 {Capacitor.getPlatform() === 'web' && (
                     <button
                         onClick={() => setShowConnectModal(true)}
-                        className="p-3 bg-gray-800/50 hover:bg-gray-700/80 rounded-full text-gray-400 hover:text-white transition-all backdrop-blur-sm border border-gray-700/50"
+                        className="p-2 bg-gray-800/50 hover:bg-gray-700/80 rounded-full text-gray-400 hover:text-white transition-all backdrop-blur-sm border border-gray-700/50"
                         title={t('connect_mobile')}
                     >
-                        <Smartphone size={24} />
+                        <Smartphone size={18} />
                     </button>
                 )}
 
                 {/* Record Button */}
                 <button
                     onClick={() => setIsRecording(!isRecording)}
-                    className={`p-3 rounded-full transition-all backdrop-blur-sm border ${isRecording
+                    className={`p-2 rounded-full transition-all backdrop-blur-sm border ${isRecording
                         ? 'bg-red-500/20 hover:bg-red-500/30 text-red-500 border-red-500/50 animate-pulse'
                         : 'bg-gray-800/50 hover:bg-gray-700/80 text-gray-400 hover:text-white border-gray-700/50'
                         }`}
                     title={t('record_session')}
                 >
-                    <Circle size={24} fill={isRecording ? "currentColor" : "none"} />
+                    <Circle size={18} fill={isRecording ? "currentColor" : "none"} />
                 </button>
 
                 {/* Donation Button */}
                 <button
                     onClick={() => setShowDonationModal(true)}
-                    className="p-3 bg-gray-800/50 hover:bg-gray-700/80 rounded-full text-red-400 hover:text-red-500 transition-all backdrop-blur-sm border border-gray-700/50 group"
+                    className="p-2 bg-gray-800/50 hover:bg-gray-700/80 rounded-full text-red-400 hover:text-red-500 transition-all backdrop-blur-sm border border-gray-700/50 group"
                     title={t('support_us')}
                 >
-                    <Heart size={24} className="group-hover:scale-110 transition-transform" />
+                    <Heart size={18} className="group-hover:scale-110 transition-transform" />
                 </button>
 
                 {/* Theme Button */}
                 <button
                     onClick={() => setShowThemeSelector(true)}
-                    className="p-3 bg-gray-800/50 hover:bg-gray-700/80 rounded-full text-blue-400 hover:text-blue-500 transition-all backdrop-blur-sm border border-gray-700/50 group"
+                    className="p-2 bg-gray-800/50 hover:bg-gray-700/80 rounded-full text-blue-400 hover:text-blue-500 transition-all backdrop-blur-sm border border-gray-700/50 group"
                     title={t('change_theme')}
                 >
-                    <Palette size={24} className="group-hover:scale-110 transition-transform" />
+                    <Palette size={18} className="group-hover:scale-110 transition-transform" />
                 </button>
 
                 {/* Dark/Light Mode Toggle */}
@@ -332,27 +506,67 @@ export default function Dashboard({ data, toggleFullScreen, isFullscreen, connec
                         setIsDarkMode(newMode);
                         localStorage.setItem('dashboardDarkMode', JSON.stringify(newMode));
                     }}
-                    className="p-3 bg-gray-800/50 hover:bg-gray-700/80 rounded-full text-yellow-400 hover:text-yellow-500 transition-all backdrop-blur-sm border border-gray-700/50 group"
+                    className="p-2 bg-gray-800/50 hover:bg-gray-700/80 rounded-full text-yellow-400 hover:text-yellow-500 transition-all backdrop-blur-sm border border-gray-700/50 group"
                     title="Toggle Dark/Light Mode"
                 >
                     {isDarkMode ? (
-                        <Sun size={24} className="group-hover:scale-110 transition-transform" />
+                        <Sun size={18} className="group-hover:scale-110 transition-transform" />
                     ) : (
-                        <Moon size={24} className="group-hover:scale-110 transition-transform" />
+                        <Moon size={18} className="group-hover:scale-110 transition-transform" />
                     )}
                 </button>
+
+                {/* Alerts Button */}
+                {onOpenAlerts && (
+                    <button
+                        onClick={onOpenAlerts}
+                        className="p-2 bg-gray-800/50 hover:bg-gray-700/80 rounded-full text-orange-400 hover:text-orange-500 transition-all backdrop-blur-sm border border-gray-700/50 group"
+                        title={t('alerts_settings')}
+                    >
+                        <Bell size={18} className="group-hover:scale-110 transition-transform" />
+                    </button>
+                )}
+
+                {/* History Button */}
+                {onOpenHistory && (
+                    <button
+                        onClick={onOpenHistory}
+                        className="p-2 bg-gray-800/50 hover:bg-gray-700/80 rounded-full text-purple-400 hover:text-purple-500 transition-all backdrop-blur-sm border border-gray-700/50 group"
+                        title={t('session_history')}
+                    >
+                        <History size={18} className="group-hover:scale-110 transition-transform" />
+                    </button>
+                )}
             </div>
 
-            {/* MOBILE MENU (Bottom Bar) - Visible only on mobile */}
-            <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-40 flex gap-4 md:hidden bg-gray-900/80 p-2 rounded-full backdrop-blur-md border border-gray-700/50">
-                <button onClick={() => setIsRecording(!isRecording)} className={`p-2 rounded-full ${isRecording ? 'text-red-500' : 'text-gray-400'}`}>
-                    <Circle size={20} fill={isRecording ? "currentColor" : "none"} />
+            {/* MOBILE MENU (Bottom Bar) - Hidden until tap */}
+            <div className={`absolute bottom-4 left-1/2 -translate-x-1/2 z-40 flex gap-2 md:hidden bg-gray-900/80 px-3 py-1.5 rounded-full backdrop-blur-md border border-gray-700/50 transition-all duration-300 ${showControls ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4 pointer-events-none'}`}>
+                {onReturnToConfig && (
+                    <button onClick={onReturnToConfig} className="p-1.5 rounded-full text-cyan-400">
+                        <Home size={18} />
+                    </button>
+                )}
+                <button onClick={() => setIsRecording(!isRecording)} className={`p-1.5 rounded-full ${isRecording ? 'text-red-500' : 'text-gray-400'}`}>
+                    <Circle size={18} fill={isRecording ? "currentColor" : "none"} />
                 </button>
-                <button onClick={() => setShowThemeSelector(true)} className="p-2 rounded-full text-blue-400">
-                    <Palette size={20} />
+                <button onClick={() => setShowThemeSelector(true)} className="p-1.5 rounded-full text-blue-400">
+                    <Palette size={18} />
                 </button>
-                <button onClick={() => setIsDarkMode(!isDarkMode)} className="p-2 rounded-full text-yellow-400">
-                    {isDarkMode ? <Sun size={20} /> : <Moon size={20} />}
+                <button onClick={() => setIsDarkMode(!isDarkMode)} className="p-1.5 rounded-full text-yellow-400">
+                    {isDarkMode ? <Sun size={18} /> : <Moon size={18} />}
+                </button>
+                {onOpenAlerts && (
+                    <button onClick={onOpenAlerts} className="p-1.5 rounded-full text-orange-400">
+                        <Bell size={18} />
+                    </button>
+                )}
+                {onOpenHistory && (
+                    <button onClick={onOpenHistory} className="p-1.5 rounded-full text-purple-400">
+                        <History size={18} />
+                    </button>
+                )}
+                <button onClick={() => setShowDonationModal(true)} className="p-1.5 rounded-full text-red-400">
+                    <Heart size={18} />
                 </button>
             </div>
 
@@ -422,8 +636,7 @@ export default function Dashboard({ data, toggleFullScreen, isFullscreen, connec
                 {viewMode === 'default' && (
                     <div className="absolute top-4 left-4 flex items-center gap-2 opacity-70 md:ml-16">
                         <MonitorPlay className="text-green-400 animate-pulse" size={20} />
-                        <MonitorPlay className="text-green-400 animate-pulse" size={20} />
-                        <span className="text-xs font-bold tracking-[0.2em] text-green-400">FPS MONITOR RR</span>
+                        <span className="text-xs font-bold tracking-[0.2em] text-green-400">FrameForge</span>
                         <button
                             onClick={(e) => { e.stopPropagation(); setShowClock(true); }}
                             className="ml-2 text-green-400/50 hover:text-green-400 transition-colors"
@@ -565,7 +778,7 @@ export default function Dashboard({ data, toggleFullScreen, isFullscreen, connec
                         {/* RAM MODULE */}
                         <div
                             onContextMenu={(e) => { e.preventDefault(); handleLongPress('ram'); }}
-                            className={`flex-1 rounded-xl border ${theme.colors.border} p-4 flex flex-col justify-center relative overflow-hidden group hover:border-purple-500/50 transition-all cursor-pointer`}
+                            className={`flex-1 rounded-xl border p-4 flex flex-col justify-center relative overflow-hidden group hover:border-purple-500/50 transition-all cursor-pointer ${globalSettings?.rgbBorder ? 'rgb-border-animated' : theme.colors.border}`}
                             style={{ backgroundColor: 'rgba(17, 24, 39, 0.4)' }}
                         >
                             <div className="flex justify-between items-center mb-2">
@@ -596,7 +809,7 @@ export default function Dashboard({ data, toggleFullScreen, isFullscreen, connec
                                 <div
                                     key={gpu.id}
                                     onContextMenu={(e) => { e.preventDefault(); handleLongPress('gpu'); }}
-                                    className={`flex-1 rounded-xl border ${theme.colors.border} p-4 flex flex-col justify-center relative overflow-hidden group hover:border-orange-500/50 transition-all cursor-pointer`}
+                                    className={`flex-1 rounded-xl border p-4 flex flex-col justify-center relative overflow-hidden group hover:border-orange-500/50 transition-all cursor-pointer ${globalSettings?.rgbBorder ? 'rgb-border-animated' : theme.colors.border}`}
                                     style={{ backgroundColor: 'rgba(17, 24, 39, 0.4)' }}
                                 >
                                     <div className="flex justify-between items-center mb-2">
@@ -631,7 +844,7 @@ export default function Dashboard({ data, toggleFullScreen, isFullscreen, connec
                         {/* CPU MODULE */}
                         <div
                             onContextMenu={(e) => { e.preventDefault(); handleLongPress('cpu'); }}
-                            className={`flex-1 rounded-xl border ${theme.colors.border} p-4 flex flex-col justify-center relative overflow-hidden group hover:border-red-500/50 transition-all cursor-pointer`}
+                            className={`flex-1 rounded-xl border p-4 flex flex-col justify-center relative overflow-hidden group hover:border-red-500/50 transition-all cursor-pointer ${globalSettings?.rgbBorder ? 'rgb-border-animated' : theme.colors.border}`}
                             style={{ backgroundColor: 'rgba(17, 24, 39, 0.4)' }}
                         >
                             <div className="flex justify-between items-center mb-2">
@@ -668,7 +881,16 @@ export default function Dashboard({ data, toggleFullScreen, isFullscreen, connec
             )}
 
             {showThemeSelector && (
-                <ThemeSelector currentTheme={currentTheme} onSelectTheme={handleThemeChange} onClose={() => setShowThemeSelector(false)} />
+                <ThemeSelector
+                    currentTheme={currentTheme}
+                    onSelectTheme={handleThemeChange}
+                    onClose={() => setShowThemeSelector(false)}
+                    currentBackground={currentBackground}
+                    onSelectBackground={handleSelectBackground}
+                    onUploadBackground={handleUploadBackground}
+                    globalSettings={globalSettings}
+                    onUpdateGlobalSettings={handleUpdateGlobalSettings}
+                />
             )}
 
             {showColorPicker && (
@@ -687,6 +909,8 @@ export default function Dashboard({ data, toggleFullScreen, isFullscreen, connec
                         serverAddress={serverAddress}
                         setServerAddress={setServerAddress}
                         onDismiss={() => setShowClock(false)}
+                        isDemo={isDemo}
+                        onExitDemo={onReturnToConfig}
                     />
                 </div>
             )}

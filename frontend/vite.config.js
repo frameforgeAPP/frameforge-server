@@ -25,33 +25,33 @@ export default defineConfig({
   plugins: [
     basicSsl(),
     react(),
-    VitePWA({
-      registerType: 'autoUpdate',
-      devOptions: {
-        enabled: true
-      },
-      includeAssets: ['vite.svg'],
-      manifest: {
-        name: 'FPS MONITOR RR',
-        short_name: 'FPS MONITOR RR',
-        description: 'Real-time PC Hardware Monitor',
-        theme_color: '#242424',
-        background_color: '#242424',
-        display: 'fullscreen',
-        orientation: 'landscape',
-        icons: [
-          {
-            src: 'pwa-192x192.png',
-            sizes: '192x192',
-            type: 'image/png'
-          },
-          {
-            src: 'pwa-512x512.png',
-            sizes: '512x512',
-            type: 'image/png'
-          }
-        ]
-      }
-    })
+    // VitePWA({
+    //   registerType: 'autoUpdate',
+    //   devOptions: {
+    //     enabled: true
+    //   },
+    //   includeAssets: ['vite.svg'],
+    //   manifest: {
+    //     name: 'FPS MONITOR RR',
+    //     short_name: 'FPS MONITOR RR',
+    //     description: 'Real-time PC Hardware Monitor',
+    //     theme_color: '#242424',
+    //     background_color: '#242424',
+    //     display: 'fullscreen',
+    //     orientation: 'landscape',
+    //     icons: [
+    //       {
+    //         src: 'pwa-192x192.png',
+    //         sizes: '192x192',
+    //         type: 'image/png'
+    //       },
+    //       {
+    //         src: 'pwa-512x512.png',
+    //         sizes: '512x512',
+    //         type: 'image/png'
+    //       }
+    //     ]
+    //   }
+    // })
   ],
 })

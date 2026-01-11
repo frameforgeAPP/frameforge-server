@@ -4,3 +4,9 @@ python-socketio
 psutil
 gputil
 zeroconf
+pystray
+Pillow
+pywin32
+qrcode
+colorama
+pyinstaller

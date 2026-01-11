@@ -1,4 +1,22 @@
 export const themes = {
+    default: {
+        name: "Default",
+        colors: {
+            bg: "bg-gray-900",
+            text: "text-white",
+            border: "border-gray-700",
+            panelBg: "bg-gray-800",
+            accent: "text-blue-500",
+            accentBg: "bg-blue-500",
+            secondary: "text-purple-500",
+            secondaryBg: "bg-purple-500",
+            highlight: "text-orange-500",
+            highlightBg: "bg-orange-500",
+            success: "text-green-500",
+            danger: "text-red-500",
+            grid: "rgba(255,255,255,0.05)"
+        }
+    },
     custom: {
         name: "Personalizável",
         colors: {
@@ -17,49 +35,13 @@ export const themes = {
             grid: "rgba(255,255,255,0.1)"
         }
     },
-    default: {
-        name: "Default",
-        colors: {
-            bg: "bg-[#0a0a0a]",
-            text: "text-white",
-            border: "border-gray-800",
-            panelBg: "bg-gray-900",
-            accent: "text-blue-500",
-            accentBg: "bg-blue-500",
-            secondary: "text-purple-400",
-            secondaryBg: "bg-purple-500",
-            highlight: "text-orange-400",
-            highlightBg: "bg-orange-500",
-            success: "text-green-400",
-            danger: "text-red-500",
-            grid: "rgba(255,255,255,0.1)"
-        }
-    },
-    cyberpunk: {
-        name: "Cyberpunk",
-        colors: {
-            bg: "bg-[#fcee0a]", // Vivid Yellow
-            text: "text-black", // Black
-            border: "border-black", // Black
-            panelBg: "bg-[#e6d909]", // Slightly darker yellow
-            accent: "text-black",
-            accentBg: "bg-black",
-            secondary: "text-black",
-            secondaryBg: "bg-black",
-            highlight: "text-black",
-            highlightBg: "bg-black",
-            success: "text-black",
-            danger: "text-[#ff003c]", // Red for danger remains
-            grid: "rgba(0, 0, 0, 0.15)" // Black Grid
-        }
-    },
     redDragon: {
         name: "Red Dragon",
         colors: {
-            bg: "bg-[#0a0a0a]", // Black
-            text: "text-[#ff0000]", // Red
-            border: "border-[#800000]", // Dark Red
-            panelBg: "bg-[#1a0505]", // Very Dark Red/Black
+            bg: "bg-[#0a0a0a]",
+            text: "text-[#ff0000]",
+            border: "border-[#800000]",
+            panelBg: "bg-[#1a0505]",
             accent: "text-[#ff0000]",
             accentBg: "bg-[#ff0000]",
             secondary: "text-[#cc0000]",
@@ -71,119 +53,65 @@ export const themes = {
             grid: "rgba(255, 0, 0, 0.15)"
         }
     },
-    toxicGreen: {
-        name: "Toxic Green",
+    midnightPurple: {
+        name: "Midnight Purple",
         colors: {
-            bg: "bg-[#0a0a0a]", // Black
-            text: "text-[#39ff14]", // Neon Green
-            border: "border-[#39ff14]",
-            panelBg: "bg-[#051a05]", // Very Dark Green/Black
-            accent: "text-[#39ff14]",
-            accentBg: "bg-[#39ff14]",
-            secondary: "text-[#32cd32]",
-            secondaryBg: "bg-[#32cd32]",
-            highlight: "text-[#98fb98]",
-            highlightBg: "bg-[#98fb98]",
-            success: "text-[#39ff14]",
+            bg: "bg-[#0d0015]",
+            text: "text-[#d8b4fe]",
+            border: "border-[#581c87]",
+            panelBg: "bg-[#1a0a2e]",
+            accent: "text-[#a855f7]",
+            accentBg: "bg-[#a855f7]",
+            secondary: "text-[#c084fc]",
+            secondaryBg: "bg-[#c084fc]",
+            highlight: "text-[#e879f9]",
+            highlightBg: "bg-[#e879f9]",
+            success: "text-[#4ade80]",
+            danger: "text-[#f87171]",
+            grid: "rgba(168, 85, 247, 0.15)"
+        }
+    },
+    carbonBlack: {
+        name: "Carbon Black",
+        colors: {
+            bg: "bg-[#000000]",
+            text: "text-[#e5e5e5]",
+            border: "border-[#262626]",
+            panelBg: "bg-[#0a0a0a]",
+            accent: "text-[#a3a3a3]",
+            accentBg: "bg-[#a3a3a3]",
+            secondary: "text-[#737373]",
+            secondaryBg: "bg-[#737373]",
+            highlight: "text-[#ffffff]",
+            highlightBg: "bg-[#ffffff]",
+            success: "text-[#22c55e]",
+            danger: "text-[#ef4444]",
+            grid: "rgba(255, 255, 255, 0.05)"
+        }
+    },
+    neonOrange: {
+        name: "Neon Orange",
+        colors: {
+            bg: "bg-[#0a0a0a]",
+            text: "text-[#ff6600]",
+            border: "border-[#cc5500]",
+            panelBg: "bg-[#1a0d00]",
+            accent: "text-[#ff8c00]",
+            accentBg: "bg-[#ff8c00]",
+            secondary: "text-[#ffa500]",
+            secondaryBg: "bg-[#ffa500]",
+            highlight: "text-[#ffb347]",
+            highlightBg: "bg-[#ffb347]",
+            success: "text-[#00ff00]",
             danger: "text-[#ff0000]",
-            grid: "rgba(57, 255, 20, 0.15)"
-        }
-    },
-    ice: {
-        name: "Ice",
-        colors: {
-            bg: "bg-[#f0f8ff]", // Alice Blue (Very light)
-            text: "text-[#00bfff]", // Deep Sky Blue
-            border: "border-[#b0e0e6]", // Powder Blue
-            panelBg: "bg-[#ffffff]", // White
-            accent: "text-[#1e90ff]", // Dodger Blue
-            accentBg: "bg-[#1e90ff]",
-            secondary: "text-[#87ceeb]", // Sky Blue
-            secondaryBg: "bg-[#87ceeb]",
-            highlight: "text-[#4682b4]", // Steel Blue
-            highlightBg: "bg-[#4682b4]",
-            success: "text-[#32cd32]",
-            danger: "text-[#ff4500]",
-            grid: "rgba(0, 191, 255, 0.1)"
-        }
-    },
-    military: {
-        name: "Military",
-        colors: {
-            bg: "bg-[#1e211d]", // Dark Olive
-            text: "text-[#aebfa3]", // Sage Green
-            border: "border-[#4b5320]", // Army Green
-            panelBg: "bg-[#2b3026]",
-            accent: "text-[#d2b48c]", // Tan
-            accentBg: "bg-[#d2b48c]",
-            secondary: "text-[#8f9779]", // Artichoke
-            secondaryBg: "bg-[#8f9779]",
-            highlight: "text-[#f5f5dc]", // Beige
-            highlightBg: "bg-[#f5f5dc]",
-            success: "text-[#aebfa3]",
-            danger: "text-[#8b0000]",
-            grid: "rgba(174, 191, 163, 0.1)"
-        }
-    },
-    scifi: {
-        name: "Sci-Fi HUD",
-        colors: {
-            bg: "bg-[#020b14]", // Deep Navy
-            text: "text-[#00ffff]", // Cyan
-            border: "border-[#008b8b]", // Dark Cyan
-            panelBg: "bg-[#051525]",
-            accent: "text-[#00ffff]",
-            accentBg: "bg-[#00ffff]",
-            secondary: "text-[#00ced1]", // Dark Turquoise
-            secondaryBg: "bg-[#00ced1]",
-            highlight: "text-[#e0ffff]", // Light Cyan
-            highlightBg: "bg-[#e0ffff]",
-            success: "text-[#00ffff]",
-            danger: "text-[#ff4500]",
-            grid: "rgba(0, 255, 255, 0.15)"
-        }
-    },
-    gold: {
-        name: "Gold Prestige",
-        colors: {
-            bg: "bg-[#121212]", // Rich Black
-            text: "text-[#ffd700]", // Gold
-            border: "border-[#daa520]", // Goldenrod
-            panelBg: "bg-[#1c1c1c]",
-            accent: "text-[#ffd700]",
-            accentBg: "bg-[#ffd700]",
-            secondary: "text-[#b8860b]", // Dark Goldenrod
-            secondaryBg: "bg-[#b8860b]",
-            highlight: "text-[#fff8dc]", // Cornsilk
-            highlightBg: "bg-[#fff8dc]",
-            success: "text-[#ffd700]",
-            danger: "text-[#cd5c5c]",
-            grid: "rgba(255, 215, 0, 0.15)"
-        }
-    },
-    kawaii: {
-        name: "Kawaii",
-        colors: {
-            bg: "bg-[#fff0f5]", // Lavender Blush
-            text: "text-[#ff69b4]", // Hot Pink
-            border: "border-[#ffb6c1]", // Light Pink
-            panelBg: "bg-[#ffffff]",
-            accent: "text-[#87cefa]", // Light Sky Blue
-            accentBg: "bg-[#87cefa]",
-            secondary: "text-[#dda0dd]", // Plum
-            secondaryBg: "bg-[#dda0dd]",
-            highlight: "text-[#ff1493]", // Deep Pink
-            highlightBg: "bg-[#ff1493]",
-            success: "text-[#98fb98]",
-            danger: "text-[#ff6347]",
-            grid: "rgba(255, 105, 180, 0.15)"
+            grid: "rgba(255, 102, 0, 0.15)"
         }
     },
     matrix: {
         name: "The Matrix",
         colors: {
             bg: "bg-black",
-            text: "text-[#00ff41]", // Matrix Green
+            text: "text-[#00ff41]",
             border: "border-[#008f11]",
             panelBg: "bg-[#050505]",
             accent: "text-[#00ff41]",
@@ -200,19 +128,116 @@ export const themes = {
     synthwave: {
         name: "Synthwave",
         colors: {
-            bg: "bg-[#1a0b2e]", // Deep Purple
-            text: "text-[#ff71ce]", // Neon Pink
-            border: "border-[#01cdfe]", // Neon Blue
-            panelBg: "bg-[#2b1055]", // Lighter Purple
-            accent: "text-[#05ffa1]", // Neon Green
+            bg: "bg-[#1a0b2e]",
+            text: "text-[#ff71ce]",
+            border: "border-[#01cdfe]",
+            panelBg: "bg-[#2b1055]",
+            accent: "text-[#05ffa1]",
             accentBg: "bg-[#05ffa1]",
-            secondary: "text-[#b967ff]", // Purple
+            secondary: "text-[#b967ff]",
             secondaryBg: "bg-[#b967ff]",
-            highlight: "text-[#fffb96]", // Yellow
+            highlight: "text-[#fffb96]",
             highlightBg: "bg-[#fffb96]",
             success: "text-[#05ffa1]",
             danger: "text-[#ff71ce]",
             grid: "rgba(185, 103, 255, 0.15)"
+        }
+    },
+    cyberpunk: {
+        name: "Cyberpunk",
+        colors: {
+            bg: "bg-[#fcee0a]",
+            text: "text-black",
+            border: "border-black",
+            panelBg: "bg-[#e6d909]",
+            accent: "text-black",
+            accentBg: "bg-black",
+            secondary: "text-black",
+            secondaryBg: "bg-black",
+            highlight: "text-black",
+            highlightBg: "bg-black",
+            success: "text-black",
+            danger: "text-[#ff003c]",
+            grid: "rgba(0, 0, 0, 0.15)"
+        }
+    },
+    pixel: {
+        name: "8-Bit Retro",
+        isPixelFont: true,
+        fontClass: "font-pixel",
+        fontFamily: "'Press Start 2P', monospace",
+        colors: {
+            bg: "bg-[#0f380f]",
+            text: "text-[#9bbc0f]",
+            border: "border-[#306230]",
+            panelBg: "bg-[#306230]",
+            accent: "text-[#9bbc0f]",
+            accentBg: "bg-[#9bbc0f]",
+            secondary: "text-[#8bac0f]",
+            secondaryBg: "bg-[#8bac0f]",
+            highlight: "text-[#e0f8cf]",
+            highlightBg: "bg-[#e0f8cf]",
+            success: "text-[#9bbc0f]",
+            danger: "text-[#ff0044]",
+            grid: "rgba(155, 188, 15, 0.2)"
+        }
+    },
+    barbie: {
+        name: "Barbie",
+        colors: {
+            bg: "bg-[#ff69b4]", // Hot Pink
+            text: "text-white",
+            border: "border-[#ff1493]", // Deep Pink
+            panelBg: "bg-[#ff85c1]", // Light Pink
+            accent: "text-white",
+            accentBg: "bg-white",
+            secondary: "text-[#fff0f5]", // Lavender Blush
+            secondaryBg: "bg-[#fff0f5]",
+            highlight: "text-[#ff1493]",
+            highlightBg: "bg-[#ff1493]",
+            success: "text-[#98fb98]",
+            danger: "text-[#ff0000]",
+            grid: "rgba(255, 255, 255, 0.2)"
+        }
+    },
+    minecraft: {
+        name: "Minecraft",
+        isPixelFont: true,
+        fontClass: "font-minecraft",
+        fontFamily: "'Silkscreen', 'Press Start 2P', monospace",
+        colors: {
+            bg: "bg-[#5d4037]",
+            text: "text-[#8bc34a]",
+            border: "border-[#3e2723]",
+            panelBg: "bg-[#795548]",
+            accent: "text-[#4caf50]",
+            accentBg: "bg-[#4caf50]",
+            secondary: "text-[#8d6e63]",
+            secondaryBg: "bg-[#8d6e63]",
+            highlight: "text-[#ffeb3b]",
+            highlightBg: "bg-[#ffeb3b]",
+            success: "text-[#8bc34a]",
+            danger: "text-[#f44336]",
+            grid: "rgba(139, 195, 74, 0.15)"
+        }
+    },
+    roblox: {
+        name: "Roblox",
+        fontClass: "font-roblox",
+        colors: {
+            bg: "bg-[#1b2838]",
+            text: "text-white",
+            border: "border-[#e2231a]",
+            panelBg: "bg-[#232f3e]",
+            accent: "text-[#e2231a]",
+            accentBg: "bg-[#e2231a]",
+            secondary: "text-[#00a2ff]",
+            secondaryBg: "bg-[#00a2ff]",
+            highlight: "text-[#01b757]",
+            highlightBg: "bg-[#01b757]",
+            success: "text-[#01b757]",
+            danger: "text-[#e2231a]",
+            grid: "rgba(226, 35, 26, 0.1)"
         }
     }
 };

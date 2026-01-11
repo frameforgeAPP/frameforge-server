@@ -1,7 +1,7 @@
 <?xml version='1.0' encoding='utf-8'?>
 <resources>
-    <string name="app_name">FPS MONITOR RR</string>
-    <string name="title_activity_main">FPS MONITOR RR</string>
+    <string name="app_name">FrameForge - FPS Monitor Gamer</string>
+    <string name="title_activity_main">FrameForge</string>
     <string name="package_name">com.fps.monitor</string>
     <string name="custom_url_scheme">com.fps.monitor</string>
 </resources>

@@ -25,6 +25,16 @@ const translations = {
         "gb_ram": "GB RAM",
         "cpu": "CPU",
         "gpu": "GPU",
+        "exit_demo": "Exit Demo",
+        "exit_fullscreen": "Exit Fullscreen",
+        "temperature": "Temperature",
+        "load": "Load",
+        "cpu_processor": "CPU PROCESSOR",
+        "gpu_graphics": "GPU GRAPHICS",
+        "ram_memory": "RAM MEMORY",
+        "system": "SYSTEM",
+        "used_gb": "Used GB",
+        "usage": "Usage",
 
         // Game Summary
         "session_complete": "Session Complete",
@@ -58,6 +68,53 @@ const translations = {
         "manual_connection": "Manual Connection",
         "try_demo": "Try Demo Mode",
         "built_for_gamers": "Built for Gamers",
+
+        // Alerts
+        "alerts_settings": "Alerts",
+        "alerts_enabled": "Alerts Enabled",
+        "temperature_limits": "Temperature Limits",
+        "minimum": "Minimum",
+        "notification_type": "Notification Type",
+        "vibration": "Vibration",
+        "sound": "Sound",
+        "test_vibration": "Test Vibration",
+        "test_sound": "Test Sound",
+        "reset": "Reset",
+        "done": "Done",
+
+        // Session History
+        "session_history": "History",
+        "confirm_clear_all": "Clear all history?",
+        "compare_sessions": "Compare",
+        "cancel_compare": "Cancel",
+        "compare_selected": "Compare Selected",
+        "no_sessions": "No sessions recorded",
+        "sessions_info": "Sessions are saved automatically when you play",
+        "clear_all_history": "Clear All History",
+
+        // Export Report
+        "performance_report": "Report",
+        "share_report": "Share Report",
+        "copied_to_clipboard": "Copied to clipboard!",
+        "average": "Average",
+        "maximum": "Maximum",
+
+        // Performance Compare
+        "compare_performance": "Compare",
+        "max_temp": "Max Temp",
+        "duration": "Duration",
+        "close": "Close",
+
+        // Tutorial
+        "skip": "Skip",
+        "previous": "Previous",
+        "next": "Next",
+        "finish": "Finish",
+
+        // Offline
+        "offline_title": "No Connection",
+        "offline_message": "Check your Wi-Fi or network connection",
+        "retry": "Retry",
     },
     pt: {
         // Connection Screen
@@ -80,6 +137,16 @@ const translations = {
         "gb_ram": "GB RAM",
         "cpu": "CPU",
         "gpu": "GPU",
+        "exit_demo": "Sair do Demo",
+        "exit_fullscreen": "Sair da Tela Cheia",
+        "temperature": "Temperatura",
+        "load": "Carga",
+        "cpu_processor": "PROCESSADOR",
+        "gpu_graphics": "PLACA DE VÍDEO",
+        "ram_memory": "MEMÓRIA RAM",
+        "system": "SISTEMA",
+        "used_gb": "GB Usado",
+        "usage": "Uso",
 
         // Game Summary
         "session_complete": "Sessão Finalizada",
@@ -113,6 +180,53 @@ const translations = {
         "manual_connection": "Conexão Manual",
         "try_demo": "Testar Modo Demo",
         "built_for_gamers": "Feito para Gamers",
+
+        // Alerts
+        "alerts_settings": "Alertas",
+        "alerts_enabled": "Alertas Ativados",
+        "temperature_limits": "Limites de Temperatura",
+        "minimum": "Mínimo",
+        "notification_type": "Tipo de Notificação",
+        "vibration": "Vibração",
+        "sound": "Som",
+        "test_vibration": "Testar Vibração",
+        "test_sound": "Testar Som",
+        "reset": "Resetar",
+        "done": "Concluído",
+
+        // Session History
+        "session_history": "Histórico",
+        "confirm_clear_all": "Limpar todo o histórico?",
+        "compare_sessions": "Comparar",
+        "cancel_compare": "Cancelar",
+        "compare_selected": "Comparar Selecionadas",
+        "no_sessions": "Nenhuma sessão registrada",
+        "sessions_info": "As sessões são salvas automaticamente quando você joga",
+        "clear_all_history": "Limpar Todo Histórico",
+
+        // Export Report
+        "performance_report": "Relatório",
+        "share_report": "Compartilhar Relatório",
+        "copied_to_clipboard": "Copiado para área de transferência!",
+        "average": "Média",
+        "maximum": "Máximo",
+
+        // Performance Compare
+        "compare_performance": "Comparar",
+        "max_temp": "Temp Máx",
+        "duration": "Duração",
+        "close": "Fechar",
+
+        // Tutorial
+        "skip": "Pular",
+        "previous": "Anterior",
+        "next": "Próximo",
+        "finish": "Concluir",
+
+        // Offline
+        "offline_title": "Sem Conexão",
+        "offline_message": "Verifique sua conexão Wi-Fi ou rede",
+        "retry": "Tentar Novamente",
     }
 };
 
