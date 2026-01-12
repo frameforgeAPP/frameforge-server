@@ -4,7 +4,6 @@ import io from 'socket.io-client';
 import { StatusBar } from '@capacitor/status-bar';
 import DashboardWithModals from './components/DashboardWithModals';
 import ConnectionScreen from './components/ConnectionScreen';
-import SplashScreen from './components/SplashScreen';
 import TutorialOverlay from './components/TutorialOverlay';
 import { generateMockData } from './utils/mockData';
 
@@ -17,7 +16,6 @@ function App() {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isDemo, setIsDemo] = useState(false);
   const [cameFromDashboard, setCameFromDashboard] = useState(false);
-  const [showSplash, setShowSplash] = useState(true);
   const [showTutorial, setShowTutorial] = useState(false);
   const [hasShownTutorial, setHasShownTutorial] = useState(() => {
     try {
@@ -280,11 +278,6 @@ function App() {
       className="min-h-screen bg-gray-900 text-white"
       onClick={handleGlobalClick}
     >
-      {/* Splash Screen */}
-      {showSplash && (
-        <SplashScreen onComplete={() => setShowSplash(false)} />
-      )}
-
       {/* Tutorial Overlay */}
       <TutorialOverlay
         isOpen={showTutorial}

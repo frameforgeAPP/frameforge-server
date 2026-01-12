@@ -115,6 +115,7 @@ const translations = {
         "offline_title": "No Connection",
         "offline_message": "Check your Wi-Fi or network connection",
         "retry": "Retry",
+        "install_afterburner_rivatuner": "Install/Open MSI Afterburner and RivaTuner on your PC to see FPS and CPU Temp",
     },
     pt: {
         // Connection Screen
@@ -227,6 +228,7 @@ const translations = {
         "offline_title": "Sem Conexão",
         "offline_message": "Verifique sua conexão Wi-Fi ou rede",
         "retry": "Tentar Novamente",
+        "install_afterburner_rivatuner": "Instale/Abra o MSI Afterburner e o RivaTuner no seu computador para ver o FPS e Temp do CPU",
     }
 };
 

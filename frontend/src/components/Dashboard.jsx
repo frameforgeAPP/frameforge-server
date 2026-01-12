@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Cpu, CircuitBoard, HardDrive, MonitorPlay, Maximize, Minimize, Clock as ClockIcon, Circle, Smartphone, X, Heart, Palette, ChevronLeft, Sun, Moon, Bell, History, Home } from 'lucide-react';
+import { Cpu, CircuitBoard, HardDrive, MonitorPlay, Maximize, Minimize, Clock as ClockIcon, Circle, Smartphone, X, Heart, Palette, ChevronLeft, Sun, Moon, Bell, History, Home, AlertTriangle } from 'lucide-react';
 import { LineChart, Line, ResponsiveContainer, YAxis } from 'recharts';
 import { ScreenBrightness } from '@capacitor-community/screen-brightness';
 import { Capacitor } from '@capacitor/core';
@@ -21,6 +21,16 @@ import { t } from '../utils/i18n';
 import { getAlertsSettings, triggerVibration, triggerSound } from '../utils/alertsUtils';
 
 export default function Dashboard({ data, toggleFullScreen, isFullscreen, connected, serverAddress, setServerAddress, isDemo, exitDemo, onOpenAlerts, onOpenHistory, onReturnToConfig }) {
+    // Check Afterburner Status
+    const [showAfterburnerAlert, setShowAfterburnerAlert] = useState(false);
+
+    useEffect(() => {
+        if (data && (data.afterburner_status === 'not-found' || data.afterburner_status === 'installed')) {
+            setShowAfterburnerAlert(true);
+        } else {
+            setShowAfterburnerAlert(false);
+        }
+    }, [data]);
     // Initialize viewMode from localStorage or default to 'default'
     const [viewMode, setViewMode] = useState(() => {
         return localStorage.getItem('dashboardViewMode') || 'default';
@@ -97,6 +107,40 @@ export default function Dashboard({ data, toggleFullScreen, isFullscreen, connec
         setCustomColors(newColors);
         localStorage.setItem('dashboardCustomColors', JSON.stringify(newColors));
         setShowColorPicker(false);
+    };
+
+    // Font Classes Map
+    const fontClasses = {
+        'pixel': 'font-pixel',
+        'minecraft': 'font-minecraft',
+        'roblox': 'font-roblox',
+        'mono': 'font-mono',
+        'rounded': 'font-sans',
+        'default': ''
+    };
+
+    // Helper to extract hex from tailwind class
+    const extractColor = (cls) => {
+        if (!cls) return '#3b82f6';
+        const match = cls.match(/#([a-fA-F0-9]{6}|[a-fA-F0-9]{3})/);
+        if (match) return match[0];
+
+        const colors = {
+            'blue-500': '#3b82f6',
+            'red-500': '#ef4444',
+            'green-500': '#22c55e',
+            'purple-500': '#a855f7',
+            'orange-500': '#f97316',
+            'cyan-500': '#06b6d4',
+            'yellow-500': '#eab308',
+            'white': '#ffffff',
+            'black': '#000000'
+        };
+
+        for (const [name, hex] of Object.entries(colors)) {
+            if (cls.includes(name)) return hex;
+        }
+        return '#3b82f6';
     };
 
     const baseTheme = themes[currentTheme] || themes.default;
@@ -343,10 +387,9 @@ export default function Dashboard({ data, toggleFullScreen, isFullscreen, connec
 
     // FPS Color Logic
     const getFpsColor = (fpsVal) => {
-        if (!fpsVal) return "#ef4444"; // Default Red if 0/null
-        if (fpsVal < 60) return "#ef4444"; // Red
-        if (fpsVal < 120) return "#22c55e"; // Green
-        return "#3b82f6"; // Blue
+        if (!fpsVal) return extractColor(theme.colors.danger);
+        // Use theme accent color for normal FPS to match theme
+        return extractColor(theme.colors.accent);
     };
 
     const fpsColor = getFpsColor(fps);
@@ -379,7 +422,7 @@ export default function Dashboard({ data, toggleFullScreen, isFullscreen, connec
                     handleLongPress('bg');
                 }
             }}
-            className={`h-screen w-screen flex flex-col md:flex-row ${theme.colors.bg} ${theme.colors.text} overflow-hidden font-sans selection:bg-orange-500 selection:text-black relative transition-all duration-500 ${isDanger ? 'border-4 border-red-600 shadow-[inset_0_0_50px_rgba(220,38,38,0.5)]' : ''}`}
+            className={`h-screen w-screen flex flex-col md:flex-row ${theme.colors.bg} ${theme.colors.text} overflow-hidden font-sans selection:bg-orange-500 selection:text-black relative transition-all duration-500 ${isDanger ? 'border-4 border-red-600 shadow-[inset_0_0_50px_rgba(220,38,38,0.5)]' : ''} ${currentTheme === 'custom' && globalSettings?.customFont ? fontClasses[globalSettings.customFont] : (theme.fontClass || '')}`}
             style={{ backgroundColor: currentTheme === 'custom' ? customColors.bg : undefined }}
         >
 
@@ -411,6 +454,22 @@ export default function Dashboard({ data, toggleFullScreen, isFullscreen, connec
                 </div>
             )}
 
+            {/* Afterburner Alert Banner - FIXED POSITION CENTERED */}
+            {showAfterburnerAlert && !isDemo && (
+                <div className="fixed top-16 left-1/2 -translate-x-1/2 z-[60] bg-yellow-600/95 text-white px-6 py-3 rounded-xl shadow-2xl flex items-center gap-4 backdrop-blur-md animate-fade-in border border-yellow-500/50 max-w-[90vw] w-max">
+                    <AlertTriangle size={24} className="text-yellow-200 flex-shrink-0" />
+                    <span className="text-sm font-bold text-center whitespace-normal leading-relaxed">
+                        {t('install_afterburner_rivatuner')}
+                    </span>
+                    <button
+                        onClick={() => setShowAfterburnerAlert(false)}
+                        className="p-2 hover:bg-white/20 rounded-full transition-colors flex-shrink-0"
+                    >
+                        <X size={20} />
+                    </button>
+                </div>
+            )}
+
             {/* TOP RIGHT SYSTEM ACTIONS (Exit Demo & Exit Fullscreen) */}
             <div className="absolute top-4 right-4 z-50 flex flex-col items-end gap-2">
                 {/* Demo Mode Indicator */}
@@ -431,6 +490,8 @@ export default function Dashboard({ data, toggleFullScreen, isFullscreen, connec
                         {t('exit_fullscreen')}
                     </button>
                 )}
+
+
             </div>
 
             {/* Exit Demo Button - ALWAYS VISIBLE when in demo mode (not affected by showControls) */}
@@ -678,10 +739,10 @@ export default function Dashboard({ data, toggleFullScreen, isFullscreen, connec
                         </div>
                     </div>
                 </div>
-            </div>
+            </div >
 
             {/* RIGHT PANEL: STATS (Blue Focus) */}
-            <div
+            < div
                 onDoubleClick={() => toggleView('stats')}
                 className={`p-4 ${theme.colors.bg} flex flex-col justify-between gap-3 transition-all duration-500 cursor-pointer select-none md:pl-4
                     ${viewMode === 'stats' ? 'w-full h-full items-center justify-center' : viewMode === 'fps' ? 'w-0 p-0 overflow-hidden opacity-0' : 'w-full h-[60%] md:w-[55%] md:h-full opacity-100'}`}
@@ -775,7 +836,46 @@ export default function Dashboard({ data, toggleFullScreen, isFullscreen, connec
                             </div>
                         )}
 
-                        {/* RAM MODULE */}
+                        {/* GPU MODULE (Primary Only) - MOVED UP */}
+                        {gpus.length > 0 && (() => {
+                            const gpu = gpus[0]; // Only show primary GPU
+                            return (
+                                <div
+                                    key={gpu.id}
+                                    onContextMenu={(e) => { e.preventDefault(); handleLongPress('gpu'); }}
+                                    className={`flex-1 rounded-xl border p-4 flex flex-col justify-center relative overflow-hidden group hover:border-orange-500/50 transition-all cursor-pointer ${globalSettings?.rgbBorder ? 'rgb-border-animated' : theme.colors.border}`}
+                                    style={{ backgroundColor: 'rgba(17, 24, 39, 0.4)' }}
+                                >
+                                    <div className="flex justify-between items-center mb-2">
+                                        <div className={`flex items-center gap-2 ${theme.colors.highlight}`} style={{ color: currentTheme === 'custom' ? customColors.gpu : undefined }}>
+                                            <CircuitBoard size={20} className={getPulseClass(gpu.load)} />
+                                            <span className="font-bold tracking-wider">{t('gpu')}</span>
+                                        </div>
+                                        <div className="flex items-center gap-4">
+                                            <div className="text-right">
+                                                <span className="text-xs text-gray-500 block">{t('temp')}</span>
+                                                <span className="text-xl font-bold transition-colors" style={{ color: getTempColor(gpu.temperature, 75) }}>{Math.round(gpu.temperature)}°C</span>
+                                            </div>
+                                            <div className="text-right">
+                                                <span className="text-xs text-gray-500 block">{t('usage')}</span>
+                                                <span className={`text-xl font-bold ${theme.colors.text}`}>{gpu.load.toFixed(0)}%</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div className="w-full bg-gray-800 rounded-full h-3 overflow-hidden">
+                                        <div
+                                            className={`h-full shadow-[0_0_10px_rgba(249,115,22,0.5)] transition-all duration-500 ${theme.colors.highlightBg}`}
+                                            style={{
+                                                width: `${gpu.load}%`,
+                                                backgroundColor: currentTheme === 'custom' ? customColors.gpu : undefined
+                                            }}
+                                        ></div>
+                                    </div>
+                                </div>
+                            );
+                        })()}
+
+                        {/* RAM MODULE - MOVED DOWN */}
                         <div
                             onContextMenu={(e) => { e.preventDefault(); handleLongPress('ram'); }}
                             className={`flex-1 rounded-xl border p-4 flex flex-col justify-center relative overflow-hidden group hover:border-purple-500/50 transition-all cursor-pointer ${globalSettings?.rgbBorder ? 'rgb-border-animated' : theme.colors.border}`}
@@ -801,45 +901,6 @@ export default function Dashboard({ data, toggleFullScreen, isFullscreen, connec
                                 ></div>
                             </div>
                         </div>
-
-                        {/* GPU MODULE (Primary Only) */}
-                        {gpus.length > 0 && (() => {
-                            const gpu = gpus[0]; // Only show primary GPU
-                            return (
-                                <div
-                                    key={gpu.id}
-                                    onContextMenu={(e) => { e.preventDefault(); handleLongPress('gpu'); }}
-                                    className={`flex-1 rounded-xl border p-4 flex flex-col justify-center relative overflow-hidden group hover:border-orange-500/50 transition-all cursor-pointer ${globalSettings?.rgbBorder ? 'rgb-border-animated' : theme.colors.border}`}
-                                    style={{ backgroundColor: 'rgba(17, 24, 39, 0.4)' }}
-                                >
-                                    <div className="flex justify-between items-center mb-2">
-                                        <div className={`flex items-center gap-2 ${theme.colors.highlight}`} style={{ color: currentTheme === 'custom' ? customColors.gpu : undefined }}>
-                                            <CircuitBoard size={20} className={getPulseClass(gpu.load)} />
-                                            <span className="font-bold tracking-wider">{t('gpu')}</span>
-                                        </div>
-                                        <div className="flex items-center gap-4">
-                                            <div className="text-right">
-                                                <span className="text-xs text-gray-500 block">{t('temp')}</span>
-                                                <span className="text-xl font-bold transition-colors" style={{ color: getTempColor(gpu.temperature, 75) }}>{Math.round(gpu.temperature)}°C</span>
-                                            </div>
-                                            <div className="text-right">
-                                                <span className="text-xs text-gray-500 block">{t('load')}</span>
-                                                <span className={`text-xl font-bold ${theme.colors.text}`}>{gpu.load.toFixed(0)}%</span>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div className="w-full bg-gray-800 rounded-full h-3 overflow-hidden">
-                                        <div
-                                            className={`h-full shadow-[0_0_10px_rgba(249,115,22,0.5)] transition-all duration-500 ${theme.colors.highlightBg}`}
-                                            style={{
-                                                width: `${gpu.load}%`,
-                                                backgroundColor: currentTheme === 'custom' ? customColors.gpu : undefined
-                                            }}
-                                        ></div>
-                                    </div>
-                                </div>
-                            );
-                        })()}
 
                         {/* CPU MODULE */}
                         <div
@@ -869,52 +930,62 @@ export default function Dashboard({ data, toggleFullScreen, isFullscreen, connec
                         </div>
                     </>
                 )}
-            </div>
+            </div >
 
             {/* MODALS */}
-            {showSummary && summaryData && (
-                <GameSummary data={summaryData} onClose={() => setShowSummary(false)} />
-            )}
+            {
+                showSummary && summaryData && (
+                    <GameSummary data={summaryData} onClose={() => setShowSummary(false)} />
+                )
+            }
 
-            {showDonationModal && (
-                <DonationModal onClose={() => setShowDonationModal(false)} />
-            )}
+            {
+                showDonationModal && (
+                    <DonationModal onClose={() => setShowDonationModal(false)} />
+                )
+            }
 
-            {showThemeSelector && (
-                <ThemeSelector
-                    currentTheme={currentTheme}
-                    onSelectTheme={handleThemeChange}
-                    onClose={() => setShowThemeSelector(false)}
-                    currentBackground={currentBackground}
-                    onSelectBackground={handleSelectBackground}
-                    onUploadBackground={handleUploadBackground}
-                    globalSettings={globalSettings}
-                    onUpdateGlobalSettings={handleUpdateGlobalSettings}
-                />
-            )}
-
-            {showColorPicker && (
-                <ColorPickerModal
-                    initialColor={customColors[colorPickerTarget]}
-                    onSave={saveCustomColor}
-                    onClose={() => setShowColorPicker(false)}
-                    title={`Color: ${colorPickerTarget?.toUpperCase()}`}
-                />
-            )}
-
-            {showClock && (
-                <div className="absolute inset-0 z-[100]">
-                    <Clock
-                        toggleFullScreen={toggleFullScreen}
-                        serverAddress={serverAddress}
-                        setServerAddress={setServerAddress}
-                        onDismiss={() => setShowClock(false)}
-                        isDemo={isDemo}
-                        onExitDemo={onReturnToConfig}
+            {
+                showThemeSelector && (
+                    <ThemeSelector
+                        currentTheme={currentTheme}
+                        onSelectTheme={handleThemeChange}
+                        onClose={() => setShowThemeSelector(false)}
+                        currentBackground={currentBackground}
+                        onSelectBackground={handleSelectBackground}
+                        onUploadBackground={handleUploadBackground}
+                        globalSettings={globalSettings}
+                        onUpdateGlobalSettings={handleUpdateGlobalSettings}
                     />
-                </div>
-            )}
-        </div>
+                )
+            }
+
+            {
+                showColorPicker && (
+                    <ColorPickerModal
+                        initialColor={customColors[colorPickerTarget]}
+                        onSave={saveCustomColor}
+                        onClose={() => setShowColorPicker(false)}
+                        title={`Color: ${colorPickerTarget?.toUpperCase()}`}
+                    />
+                )
+            }
+
+            {
+                showClock && (
+                    <div className="absolute inset-0 z-[100]">
+                        <Clock
+                            toggleFullScreen={toggleFullScreen}
+                            serverAddress={serverAddress}
+                            setServerAddress={setServerAddress}
+                            onDismiss={() => setShowClock(false)}
+                            isDemo={isDemo}
+                            onExitDemo={onReturnToConfig}
+                        />
+                    </div>
+                )
+            }
+        </div >
     );
 }
 
