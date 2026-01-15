@@ -1,0 +1,126 @@
+2026-01-12 00:19:05,391 - __main__ - INFO - Application Starting
+2026-01-12 00:19:05,392 - __main__ - INFO - Starting Server Thread
+2026-01-12 00:19:05,392 - __main__ - ERROR - Server Thread Failed: Unable to configure formatter 'default'
+Traceback (most recent call last):
+  File "logging\config.py", line 583, in configure
+  File "logging\config.py", line 693, in configure_formatter
+  File "logging\config.py", line 487, in configure_custom
+  File "uvicorn\logging.py", line 42, in __init__
+AttributeError: 'NoneType' object has no attribute 'isatty'
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "frameforge_server.py", line 800, in run_server_thread
+  File "uvicorn\config.py", line 278, in __init__
+  File "uvicorn\config.py", line 370, in configure_logging
+  File "logging\config.py", line 946, in dictConfig
+  File "logging\config.py", line 586, in configure
+ValueError: Unable to configure formatter 'default'
+2026-01-12 00:19:05,392 - __main__ - INFO - Initializing ServerGUI
+2026-01-12 00:19:05,446 - __main__ - INFO - Starting Tray Thread
+2026-01-12 00:21:36,854 - __main__ - INFO - Application Starting
+2026-01-12 00:21:36,855 - __main__ - INFO - Starting Server Thread
+2026-01-12 00:21:36,855 - __main__ - INFO - Initializing ServerGUI
+2026-01-12 00:21:36,894 - asyncio - DEBUG - Using proactor: IocpProactor
+2026-01-12 00:21:36,922 - __main__ - INFO - Starting Tray Thread
+2026-01-12 00:21:46,994 - __main__ - INFO - Application Starting
+2026-01-12 00:21:46,995 - __main__ - INFO - Starting Server Thread
+2026-01-12 00:21:46,995 - __main__ - INFO - Initializing ServerGUI
+2026-01-12 00:21:47,035 - asyncio - DEBUG - Using proactor: IocpProactor
+2026-01-12 00:21:47,070 - __main__ - INFO - Starting Tray Thread
+2026-01-12 00:28:45,742 - __main__ - INFO - Application Starting
+2026-01-12 00:28:45,742 - __main__ - INFO - Starting Server Thread
+2026-01-12 00:28:45,742 - __main__ - INFO - Initializing ServerGUI
+2026-01-12 00:32:46,126 - __main__ - INFO - Application Starting
+2026-01-12 00:32:46,126 - __main__ - INFO - Starting Server Thread
+2026-01-12 00:32:46,126 - __main__ - INFO - Initializing ServerGUI
+2026-01-12 00:34:39,300 - __main__ - INFO - Application Starting
+2026-01-12 00:34:39,301 - __main__ - INFO - Starting Server Thread
+2026-01-12 00:34:39,301 - __main__ - INFO - Initializing ServerGUI
+2026-01-12 00:38:49,281 - __main__ - INFO - Application Starting
+2026-01-12 00:38:49,281 - __main__ - INFO - Starting Server Thread
+2026-01-12 00:38:49,281 - __main__ - INFO - Initializing ServerGUI
+2026-01-12 00:47:57,650 - __main__ - INFO - Application Starting
+2026-01-12 00:47:57,650 - __main__ - INFO - Starting Server Thread
+2026-01-12 00:47:57,650 - __main__ - INFO - Initializing ServerGUI
+2026-01-12 00:53:48,608 - __main__ - INFO - Application Starting
+2026-01-12 00:53:48,609 - __main__ - INFO - Starting Server Thread
+2026-01-12 00:53:48,609 - __main__ - INFO - Initializing ServerGUI
+2026-01-12 01:00:29,021 - __main__ - INFO - Application Starting
+2026-01-12 01:00:29,021 - __main__ - INFO - Starting Server Thread
+2026-01-12 01:00:29,021 - __main__ - INFO - Initializing ServerGUI
+2026-01-12 01:01:44,448 - __main__ - INFO - Application Starting
+2026-01-12 01:01:44,449 - __main__ - INFO - Starting Server Thread
+2026-01-12 01:01:44,449 - __main__ - INFO - Initializing ServerGUI
+2026-01-12 01:07:02,745 - __main__ - INFO - Application Starting
+2026-01-12 01:07:02,746 - __main__ - INFO - Starting Server Thread
+2026-01-12 01:07:02,746 - __main__ - INFO - Initializing ServerGUI
+2026-01-12 01:10:52,006 - __main__ - INFO - Application Starting
+2026-01-12 01:10:52,007 - __main__ - INFO - Starting Server Thread
+2026-01-12 01:10:52,007 - __main__ - INFO - Initializing ServerGUI
+2026-01-12 01:20:51,675 - __main__ - INFO - Application Starting
+2026-01-12 01:20:51,675 - __main__ - INFO - Starting Server Thread
+2026-01-12 01:20:51,675 - __main__ - INFO - Initializing ServerGUI
+2026-01-12 01:31:51,102 - __main__ - INFO - Application Starting
+2026-01-12 01:31:51,103 - __main__ - INFO - Starting Server Thread
+2026-01-12 01:31:51,103 - __main__ - INFO - Initializing ServerGUI
+2026-01-12 01:32:01,662 - __main__ - INFO - Application Starting
+2026-01-12 01:32:01,662 - __main__ - INFO - Starting Server Thread
+2026-01-12 01:32:01,662 - __main__ - INFO - Initializing ServerGUI
+2026-01-12 01:35:15,648 - __main__ - INFO - Application Starting
+2026-01-12 01:35:15,649 - __main__ - INFO - Starting Server Thread
+2026-01-12 01:35:15,649 - __main__ - INFO - Initializing ServerGUI
+2026-01-12 01:37:57,854 - __main__ - INFO - Application Starting
+2026-01-12 01:37:57,854 - __main__ - INFO - Starting Server Thread
+2026-01-12 01:37:57,854 - __main__ - INFO - Initializing ServerGUI
+2026-01-12 01:38:13,947 - __main__ - INFO - Application Starting
+2026-01-12 01:38:13,947 - __main__ - INFO - Starting Server Thread
+2026-01-12 01:38:13,947 - __main__ - INFO - Initializing ServerGUI
+2026-01-12 01:38:48,865 - __main__ - INFO - Application Starting
+2026-01-12 01:38:48,866 - __main__ - INFO - Starting Server Thread
+2026-01-12 01:38:48,866 - __main__ - INFO - Initializing ServerGUI
+2026-01-12 01:39:07,577 - __main__ - INFO - Application Starting
+2026-01-12 01:39:07,577 - __main__ - INFO - Starting Server Thread
+2026-01-12 01:39:07,577 - __main__ - INFO - Initializing ServerGUI
+2026-01-12 01:47:29,380 - __main__ - INFO - Application Starting
+2026-01-12 01:47:29,381 - __main__ - INFO - Starting Server Thread
+2026-01-12 01:47:29,381 - __main__ - INFO - Initializing ServerGUI
+2026-01-12 01:48:39,384 - __main__ - INFO - Application Starting
+2026-01-12 01:48:39,384 - __main__ - INFO - Starting Server Thread
+2026-01-12 01:48:39,384 - __main__ - INFO - Initializing ServerGUI
+2026-01-12 01:49:02,715 - __main__ - INFO - Application Starting
+2026-01-12 01:49:02,716 - __main__ - INFO - Starting Server Thread
+2026-01-12 01:49:02,716 - __main__ - INFO - Initializing ServerGUI
+2026-01-12 21:30:46,532 - __main__ - INFO - Application Starting
+2026-01-12 21:30:46,532 - __main__ - INFO - Starting Server Thread
+2026-01-12 21:30:46,532 - __main__ - INFO - Initializing ServerGUI
+2026-01-13 01:38:49,252 - __main__ - INFO - Application Starting
+2026-01-13 01:38:49,252 - __main__ - INFO - Starting Server Thread
+2026-01-13 01:38:49,253 - __main__ - INFO - Initializing ServerGUI
+2026-01-13 01:38:49,647 - PIL.PngImagePlugin - DEBUG - STREAM b'IHDR' 28398 13
+2026-01-13 01:38:49,648 - PIL.PngImagePlugin - DEBUG - STREAM b'IDAT' 28423 65449
+2026-01-13 01:38:58,476 - __main__ - INFO - Application Starting
+2026-01-13 01:38:58,476 - __main__ - INFO - Starting Server Thread
+2026-01-13 01:38:58,476 - __main__ - INFO - Initializing ServerGUI
+2026-01-13 01:38:58,890 - PIL.PngImagePlugin - DEBUG - STREAM b'IHDR' 28398 13
+2026-01-13 01:38:58,890 - PIL.PngImagePlugin - DEBUG - STREAM b'IDAT' 28423 65449
+2026-01-13 01:38:59,916 - PIL.PngImagePlugin - DEBUG - STREAM b'IHDR' 16 13
+2026-01-13 01:38:59,916 - PIL.PngImagePlugin - DEBUG - STREAM b'IDAT' 41 1051
+2026-01-13 01:38:59,916 - PIL.PngImagePlugin - DEBUG - STREAM b'IHDR' 16 13
+2026-01-13 01:38:59,916 - PIL.PngImagePlugin - DEBUG - STREAM b'IDAT' 41 1051
+2026-01-13 01:38:59,927 - PIL.PngImagePlugin - DEBUG - STREAM b'IHDR' 16 13
+2026-01-13 01:38:59,927 - PIL.PngImagePlugin - DEBUG - STREAM b'IDAT' 41 881
+2026-01-13 01:38:59,927 - PIL.PngImagePlugin - DEBUG - STREAM b'IHDR' 16 13
+2026-01-13 01:38:59,927 - PIL.PngImagePlugin - DEBUG - STREAM b'IDAT' 41 881
+2026-01-14 21:46:58,397 - __main__ - INFO - Application Starting
+2026-01-14 21:46:58,397 - __main__ - INFO - Starting Server Thread
+2026-01-14 21:46:58,397 - __main__ - INFO - Initializing ServerGUI
+2026-01-14 21:47:13,565 - PIL.PngImagePlugin - DEBUG - STREAM b'IHDR' 16 13
+2026-01-14 21:47:13,565 - PIL.PngImagePlugin - DEBUG - STREAM b'IDAT' 41 1051
+2026-01-14 21:47:13,565 - PIL.PngImagePlugin - DEBUG - STREAM b'IHDR' 16 13
+2026-01-14 21:47:13,565 - PIL.PngImagePlugin - DEBUG - STREAM b'IDAT' 41 1051
+2026-01-14 21:47:13,576 - PIL.PngImagePlugin - DEBUG - STREAM b'IHDR' 16 13
+2026-01-14 21:47:13,576 - PIL.PngImagePlugin - DEBUG - STREAM b'IDAT' 41 881
+2026-01-14 21:47:13,576 - PIL.PngImagePlugin - DEBUG - STREAM b'IHDR' 16 13
+2026-01-14 21:47:13,576 - PIL.PngImagePlugin - DEBUG - STREAM b'IDAT' 41 881

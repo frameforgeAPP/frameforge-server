@@ -13,8 +13,143 @@ import os
 import threading
 import webbrowser
 import logging
+import queue
+import io
+
+import locale
+
+# ==================== TRANSLATIONS ====================
+TRANSLATIONS = {
+    "pt": {
+        "status_running": "SERVIDOR RODANDO",
+        "status_stopped": "SERVIDOR PARADO",
+        "waiting_connection": "Aguardando conexão...",
+        "devices_connected": "dispositivo(s) conectado(s)",
+        "start_with_windows": "Iniciar com Windows",
+        "minimized": "Minimizado",
+        "stop_server": "Encerrar",
+        "support": "Apoiar ❤️",
+        "theme_changed": "Tema Alterado",
+        "restart_msg": "Por favor, reinicie o servidor para aplicar o novo tema completamente.",
+        "support_title": "Apoie o FrameForge",
+        "support_header": "✨ Apoie o Projeto ✨",
+        "support_desc": "Sua doação ajuda a manter o app gratuito!",
+        "copy_pix": "Copiar Chave PIX",
+        "copied": "Copiado! ✅",
+        "open_browser": "Abrir no Navegador 🌐",
+        "scan_to_donate": "Escaneie para doar pelo celular",
+        "thank_you": "Obrigado! ❤️",
+        "msi_warning": "MSI Afterburner não detectado",
+        "msi_desc": "Abra o Afterburner + RTSS para monitorar FPS/GPU",
+        "active_game": "JOGO ATIVO",
+        "connect_qr": "CONECTAR VIA QR CODE",
+        "scan_app": "Escaneie com o app",
+        "error_qr": "Erro ao gerar QR",
+        "connection": "CONEXÃO",
+        "devices": "Dispositivos:",
+    },
+    "en": {
+        "status_running": "SERVER RUNNING",
+        "status_stopped": "SERVER STOPPED",
+        "waiting_connection": "Waiting for connection...",
+        "devices_connected": "device(s) connected",
+        "start_with_windows": "Start with Windows",
+        "minimized": "Minimized",
+        "stop_server": "Stop",
+        "support": "Support ❤️",
+        "theme_changed": "Theme Changed",
+        "restart_msg": "Please restart the server to fully apply the new theme.",
+        "support_title": "Support FrameForge",
+        "support_header": "✨ Support the Project ✨",
+        "support_desc": "Your donation helps keep the app free!",
+        "copy_pix": "Copy PIX Key",
+        "copied": "Copied! ✅",
+        "open_browser": "Open in Browser 🌐",
+        "scan_to_donate": "Scan to donate via mobile",
+        "thank_you": "Thank you! ❤️",
+        "msi_warning": "MSI Afterburner not detected",
+        "msi_desc": "Open Afterburner + RTSS to monitor FPS/GPU",
+        "active_game": "ACTIVE GAME",
+        "connect_qr": "CONNECT VIA QR CODE",
+        "scan_app": "Scan with the app",
+        "error_qr": "Error generating QR",
+        "connection": "CONNECTION",
+        "devices": "Devices:",
+    }
+}
+
+def get_system_language():
+    """Detect system language, default to 'en' if not 'pt'"""
+    try:
+        lang, _ = locale.getdefaultlocale()
+        if lang and lang.lower().startswith('pt'):
+            return 'pt'
+        return 'en'
+    except:
+        return 'en'
+
+CURRENT_LANG = get_system_language()
+
+def t(key):
+    """Get translation for key"""
+    return TRANSLATIONS[CURRENT_LANG].get(key, key)
+
+# ==================== SINGLE INSTANCE CHECK ====================
+import ctypes
+from ctypes import wintypes
+
+MUTEX_NAME = "FrameForgeServerMutex_v1"
+mutex_handle = None
+
+def check_single_instance():
+    """Check if another instance is already running using Windows Mutex"""
+    global mutex_handle
+    try:
+        mutex_handle = ctypes.windll.kernel32.CreateMutexW(None, True, MUTEX_NAME)
+        last_error = ctypes.windll.kernel32.GetLastError()
+        ERROR_ALREADY_EXISTS = 183
+        
+        if last_error == ERROR_ALREADY_EXISTS:
+            ctypes.windll.kernel32.CloseHandle(mutex_handle)
+            return False  # Another instance is running
+        return True  # This is the first instance
+    except:
+        return True  # If check fails, allow running
+
+def show_already_running_message():
+    """Show a Windows message box that the app is already running"""
+    ctypes.windll.user32.MessageBoxW(
+        0, 
+        "O FrameForge Server já está em execução!\n\nVerifique o ícone na bandeja do sistema (área de notificação).",
+        "FrameForge Server",
+        0x40  # MB_ICONINFORMATION
+    )
+
+def set_app_user_model_id():
+    """Force Windows to use the specific icon for this app group"""
+    try:
+        myappid = f'frameforge.server.gui.{APP_VERSION}'
+        ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(myappid)
+    except:
+        pass
+
+# Set ID immediately
+set_app_user_model_id()
+
+# ==================== FIX FOR FROZEN EXE ====================
+# When running as frozen exe, stdout/stderr can be None
+# This causes uvicorn's isatty() check to fail
+if getattr(sys, 'frozen', False):
+    # Redirect to devnull instead of StringIO for better compatibility
+    devnull = open(os.devnull, 'w')
+    if sys.stdout is None:
+        sys.stdout = devnull
+    if sys.stderr is None:
+        sys.stderr = devnull
+
 import tkinter as tk
-from tkinter import ttk
+import customtkinter as ctk
+from tkinter import ttk, messagebox
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -28,15 +163,20 @@ import win32com.client
 from zeroconf import ServiceInfo, Zeroconf
 import socket
 import winreg
+import qrcode
+from PIL import Image, ImageTk
+import io
+import webbrowser
 from PIL import Image, ImageTk
 import pystray
 from pystray import MenuItem as item
 import qrcode
 
+import json
+
 # ==================== SUPPRESS CONSOLE WINDOWS ====================
 
 if sys.platform == 'win32':
-    import ctypes
     try:
         kernel32 = ctypes.WinDLL('kernel32', use_last_error=True)
         user32 = ctypes.WinDLL('user32', use_last_error=True)
@@ -53,18 +193,49 @@ logging.getLogger("fastapi").setLevel(logging.ERROR)
 logging.getLogger("socketio").setLevel(logging.ERROR)
 logging.getLogger("engineio").setLevel(logging.ERROR)
 
+# Determine base path for config and logs
 if getattr(sys, 'frozen', False):
-    if sys.stdout is None or not hasattr(sys.stdout, 'write'):
-        sys.stdout = open(os.devnull, 'w')
-    if sys.stderr is None or not hasattr(sys.stderr, 'write'):
-        sys.stderr = open(os.devnull, 'w')
+    BASE_PATH = os.path.dirname(sys.executable)
+else:
+    BASE_PATH = os.path.dirname(os.path.abspath(__file__))
+
+CONFIG_FILE = os.path.join(BASE_PATH, "config.json")
+LOG_FILE = os.path.join(BASE_PATH, "server_debug.log")
+
+# Configure logging with absolute path
+logging.basicConfig(
+    filename=LOG_FILE,
+    level=logging.ERROR,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
 
 # Constants
 APP_NAME = "FrameForge Server"
-APP_VERSION = "2.2.0"
+APP_VERSION = "1.0"
 REGISTRY_KEY = r"Software\Microsoft\Windows\CurrentVersion\Run"
 SERVER_URL = "https://github.com/frameforgeAPP/frameforge-server"
 CREATE_NO_WINDOW = 0x08000000
+
+# ==================== CONFIG MANAGEMENT ====================
+
+# ==================== CONFIG MANAGEMENT ====================
+
+def load_config():
+    try:
+        if os.path.exists(CONFIG_FILE):
+            with open(CONFIG_FILE, 'r') as f:
+                return json.load(f)
+    except:
+        pass
+    return {"start_minimized": False}
+
+def save_config(config):
+    try:
+        with open(CONFIG_FILE, 'w') as f:
+            json.dump(config, f)
+    except:
+        pass
 
 # ==================== TRON THEME COLORS ====================
 COLORS = {
@@ -453,381 +624,844 @@ def generate_qr_code(data, size=120):
     qr = qrcode.QRCode(version=1, box_size=4, border=2)
     qr.add_data(data)
     qr.make(fit=True)
-    qr_img = qr.make_image(fill_color=COLORS['cyan'], back_color=COLORS['bg_dark'])
+    # Classic black on white QR code for better readability
+    qr_img = qr.make_image(fill_color='black', back_color='white')
     qr_img = qr_img.resize((size, size))
     return qr_img
 
 class ServerGUI:
+    """Modern server control panel using CustomTkinter"""
+    
     def __init__(self):
-        self.window = None
+        logger.info("Initializing ServerGUI")
+        self.queue = queue.Queue()
         self.is_open = False
-        self.stat_labels = {}
         self.server_running = True
-        self.clients_listbox = None
+        self.config = load_config()
+        self.current_theme = self.config.get("theme", "dark")
+        self.last_client_count = 0  # For connection animation
+        self.afterburner_warning_shown = False
         
-    def show(self):
-        if self.is_open and self.window:
-            try:
-                self.window.deiconify()
-                self.window.lift()
-                self.window.focus_force()
-                return
-            except:
-                pass
+        # Theme color palettes
+        self.dark_colors = {
+            'bg': '#171d25',           # Steam dark background
+            'card': '#1e2837',          # Steam card background
+            'accent': '#00f3ff',        # TRON cyan (for logo)
+            'accent_steam': '#1a9fff', # Steam blue accent
+            'accent_light': '#66c0f4',  # Steam light blue
+            'text': '#c6d4df',          # Steam text
+            'text_bright': '#ffffff',   # White
+            'text_dim': '#8f98a0',      # Dim text
+            'green': '#a4d007',         # Steam green
+            'red': '#c43c35',           # Error red
+            'yellow': '#ffcc00',        # Warning
+            'orange': '#f97316',        # Orange warning
+            'purple': '#8b5cf6',        # Synthwave Purple
+            'purple_hover': '#7c3aed',  # Darker purple
+        }
         
-        # Create main window - Tron Style
-        self.window = tk.Tk()
-        self.window.title("FrameForge Server")
-        self.window.geometry("380x720")
-        self.window.configure(bg=COLORS['bg_dark'])
+        self.light_colors = {
+            'bg': '#e8eaed',           # Light gray background
+            'card': '#ffffff',          # White card
+            'accent': '#0099cc',        # Darker cyan for light mode
+            'accent_steam': '#1a73e8', # Google blue
+            'accent_light': '#4285f4',  # Lighter blue
+            'text': '#202124',          # Dark text
+            'text_bright': '#000000',   # Black
+            'text_dim': '#5f6368',      # Gray text
+            'green': '#34a853',         # Green
+            'red': '#ea4335',           # Red
+            'yellow': '#fbbc04',        # Yellow
+            'orange': '#fa903e',        # Orange warning
+            'purple': '#8b5cf6',        # Synthwave Purple
+            'purple_hover': '#7c3aed',  # Darker purple
+        }
+        
+        # Set current colors based on theme
+        self.colors = self.dark_colors if self.current_theme == "dark" else self.light_colors
+        
+        # Configure CustomTkinter
+        ctk.set_appearance_mode(self.current_theme)
+        ctk.set_default_color_theme("blue")
+        
+        # Create main window
+        self.window = ctk.CTk()
+        self.window.title(APP_NAME)
+        self.window.geometry("380x750")
         self.window.resizable(False, False)
         
-        # Center window
-        self.window.update_idletasks()
-        x = (self.window.winfo_screenwidth() // 2) - 190
-        y = (self.window.winfo_screenheight() // 2) - 360
-        self.window.geometry(f"+{x}+{y}")
+        self.window.configure(fg_color=self.colors['bg'])
         
-        self.is_open = True
+        self._set_icon()
+        self.window.withdraw()
         self.window.protocol("WM_DELETE_WINDOW", self.hide)
         
-        # Main container
-        main = tk.Frame(self.window, bg=COLORS['bg_dark'])
-        main.pack(fill='both', expand=True, padx=20, pady=15)
+        self._build_ui()
+        self._schedule_queue_check()
+    
+    def _set_icon(self):
+        try:
+            if getattr(sys, 'frozen', False):
+                base = sys._MEIPASS if hasattr(sys, '_MEIPASS') else os.path.dirname(sys.executable)
+            else:
+                base = os.path.dirname(os.path.abspath(__file__))
+            icon_path = os.path.join(base, 'icon.ico')
+            if os.path.exists(icon_path):
+                self.window.iconbitmap(icon_path)
+        except:
+            pass
+    
+    def _build_ui(self):
+        """Build modern CustomTkinter UI"""
+        # Main scrollable container
+        self.main_frame = ctk.CTkFrame(self.window, fg_color="transparent")
+        self.main_frame.pack(fill='both', expand=True, padx=20, pady=15)
         
-        # ===== HEADER - FF LOGO =====
-        header_frame = tk.Frame(main, bg=COLORS['bg_dark'])
-        header_frame.pack(pady=(0, 5))
+        # Header
+        self._build_header(self.main_frame)
         
-        tk.Label(header_frame, text="FF", font=('Impact', 48, 'bold'),
-                fg=COLORS['cyan'], bg=COLORS['bg_dark']).pack()
+        # Status Card
+        self._build_status_card(self.main_frame)
         
-        tk.Label(header_frame, text="FrameForge", font=('Segoe UI', 16, 'bold'),
-                fg=COLORS['text'], bg=COLORS['bg_dark']).pack()
+        # Afterburner Warning (conditional)
+        self._build_afterburner_warning(self.main_frame)
         
-        tk.Label(header_frame, text="FPS MONITOR SERVER", font=('Segoe UI', 9),
-                fg=COLORS['text_dim'], bg=COLORS['bg_dark']).pack()
+        # Hardware Stats Card
+        self._build_stats_card(self.main_frame)
         
-        # ===== STATUS BAR =====
-        status_frame = tk.Frame(main, bg=COLORS['bg_card'], pady=10, padx=15)
-        status_frame.pack(fill='x', pady=10)
+        # Game Card (shows active game)
+        self._build_game_card(self.main_frame)
         
-        status_inner = tk.Frame(status_frame, bg=COLORS['bg_card'])
-        status_inner.pack()
+        # Connection Card
+        self._build_connection_card(self.main_frame)
         
-        # Glowing status dot
-        self.status_dot = tk.Label(status_inner, text="●", font=('Segoe UI', 16),
-                             fg=COLORS['cyan'], bg=COLORS['bg_card'])
-        self.status_dot.pack(side='left')
+        # QR Code Card
+        self._build_qr_card(self.main_frame)
         
-        self.status_text = tk.Label(status_inner, text="ONLINE", font=('Segoe UI', 12, 'bold'),
-                                   fg=COLORS['cyan'], bg=COLORS['bg_card'])
-        self.status_text.pack(side='left', padx=10)
+        # Footer with theme toggle
+        self._build_footer(self.main_frame)
         
-        # ===== IP ADDRESS =====
+        # Start updates
+        self._update_stats()
+
+    
+    def _build_header(self, parent):
+        """Build header with logo"""
+        header = ctk.CTkFrame(parent, fg_color="transparent")
+        header.pack(fill='x', pady=(0, 15))
+        
+        # Top row with buttons on the right
+        top_row = ctk.CTkFrame(header, fg_color="transparent")
+        top_row.pack(fill='x')
+        
+        # FF Logo (Left)
+        ctk.CTkLabel(top_row, text="FF", 
+                    font=ctk.CTkFont(family="Arial Black", size=42, weight="bold"),
+                    text_color=self.colors['accent']).pack(side='left')
+        
+        # Theme Toggle (Far Right)
+        ctk.CTkButton(top_row, text="🌓", width=32, height=32,
+                     fg_color=self.colors['card'], hover_color=self.colors['accent_steam'],
+                     corner_radius=16,
+                     font=ctk.CTkFont(size=16),
+                     command=self._toggle_theme).pack(side='right', padx=(5, 0))
+
+        # Support Button (Right)
+        ctk.CTkButton(top_row, text=t("support"), 
+                     font=ctk.CTkFont(size=12, weight="bold"),
+                     fg_color=self.colors['purple'], 
+                     hover_color=self.colors['purple_hover'],
+                     corner_radius=20,
+                     height=32,
+                     command=self.open_donation_modal).pack(side='right')
+
+        # Text row below
+        ctk.CTkLabel(header, text="FRAMEFORGE SERVER",
+                    font=ctk.CTkFont(size=14, weight="bold"),
+                    text_color=self.colors['text']).pack(anchor='w')
+        
+        ctk.CTkLabel(header, text=f"v{APP_VERSION}",
+                    font=ctk.CTkFont(size=11),
+                    text_color=self.colors['text_dim']).pack(anchor='w')
+    
+    def _build_status_card(self, parent):
+        """Server status card"""
+        self.status_card = ctk.CTkFrame(parent, fg_color=self.colors['card'], corner_radius=12)
+        self.status_card.pack(fill='x', pady=(0, 10))
+        
+        inner = ctk.CTkFrame(self.status_card, fg_color="transparent")
+        inner.pack(fill='x', padx=15, pady=12)
+        
+        # Status Indicator
+        self.status_indicator = ctk.CTkLabel(inner, text="●", 
+                                           font=ctk.CTkFont(size=24),
+                                           text_color=self.colors['green'])
+        self.status_indicator.pack(side='left')
+        
+        # Status Text
+        self.status_label = ctk.CTkLabel(inner, text=t("status_running"),
+                                       font=ctk.CTkFont(size=14, weight="bold"),
+                                       text_color=self.colors['text'])
+        self.status_label.pack(side='left', padx=(10, 0))
+        
+        # Port info
+        ctk.CTkLabel(inner, text=f"Port: 8000",
+                    font=ctk.CTkFont(family="Consolas", size=12),
+                    text_color=self.colors['text_dim']).pack(side='right')
+
+    def _build_stats_card(self, parent):
+        """Hardware stats grid"""
+        card = ctk.CTkFrame(parent, fg_color=self.colors['card'], corner_radius=12)
+        card.pack(fill='x', pady=(0, 10))
+        
+        inner = ctk.CTkFrame(card, fg_color="transparent")
+        inner.pack(fill='x', padx=15, pady=12)
+        
+        # Title
+        ctk.CTkLabel(inner, text="HARDWARE MONITOR",
+                    font=ctk.CTkFont(size=11, weight="bold"),
+                    text_color=self.colors['text_dim']).pack(anchor='w', pady=(0, 10))
+        
+        # Stats row
+        stats_row = ctk.CTkFrame(inner, fg_color="transparent")
+        stats_row.pack(fill='x')
+        
+        stats_data = [
+            ("FPS", "fps_label", 22),
+            ("CPU", "cpu_label", 14),
+            ("GPU", "gpu_label", 14),
+            ("RAM", "ram_label", 14),
+        ]
+        
+        for name, attr, font_size in stats_data:
+            box = ctk.CTkFrame(stats_row, fg_color=self.colors['bg'], corner_radius=8)
+            box.pack(side='left', fill='x', expand=True, padx=(0, 5))
+            
+            box_inner = ctk.CTkFrame(box, fg_color="transparent")
+            box_inner.pack(padx=8, pady=8)
+            
+            ctk.CTkLabel(box_inner, text=name,
+                        font=ctk.CTkFont(size=10),
+                        text_color=self.colors['text_dim']).pack()
+            
+            lbl = ctk.CTkLabel(box_inner, text="--",
+                              font=ctk.CTkFont(family="Consolas", size=font_size, weight="bold"),
+                              text_color=self.colors['accent_light'])
+            lbl.pack()
+            setattr(self, attr, lbl)
+    
+    def _build_afterburner_warning(self, parent):
+        """Warning card when Afterburner is not running"""
+        self.afterburner_card = ctk.CTkFrame(parent, fg_color=self.colors.get('orange', '#f97316'), corner_radius=12)
+        # Initially hidden, will be shown/hidden in _update_stats
+        
+        inner = ctk.CTkFrame(self.afterburner_card, fg_color="transparent")
+        inner.pack(fill='x', padx=12, pady=10)
+        
+        row = ctk.CTkFrame(inner, fg_color="transparent")
+        row.pack(fill='x')
+        
+        # Warning icon
+        ctk.CTkLabel(row, text="⚠️",
+                    font=ctk.CTkFont(size=16)).pack(side='left')
+        
+        # Warning text
+        ctk.CTkLabel(row, text=t("msi_warning"),
+                    font=ctk.CTkFont(size=11, weight="bold"),
+                    text_color='#ffffff').pack(side='left', padx=(8, 0))
+        
+        # Sub-text
+        ctk.CTkLabel(inner, text=t("msi_desc"),
+                    font=ctk.CTkFont(size=10),
+                    text_color='#cccccc').pack(anchor='w', pady=(4, 0))
+    
+    def _build_game_card(self, parent):
+        """Card showing the currently active game"""
+        self.game_card = ctk.CTkFrame(parent, fg_color=self.colors['card'], corner_radius=12)
+        # Initially hidden, shown when game is detected
+        
+        inner = ctk.CTkFrame(self.game_card, fg_color="transparent")
+        inner.pack(fill='x', padx=15, pady=10)
+        
+        row = ctk.CTkFrame(inner, fg_color="transparent")
+        row.pack(fill='x')
+        
+        # Game icon
+        ctk.CTkLabel(row, text="🎮",
+                    font=ctk.CTkFont(size=14)).pack(side='left')
+        
+        ctk.CTkLabel(row, text=t("active_game"),
+                    font=ctk.CTkFont(size=10, weight="bold"),
+                    text_color=self.colors['text_dim']).pack(side='left', padx=(8, 0))
+        
+        # Game name label
+        self.game_name_label = ctk.CTkLabel(inner, text="--",
+                                            font=ctk.CTkFont(size=13, weight="bold"),
+                                            text_color=self.colors['green'])
+        self.game_name_label.pack(anchor='w', pady=(5, 0))
+    
+    def _build_connection_card(self, parent):
+        """Connection info card"""
+        card = ctk.CTkFrame(parent, fg_color=self.colors['card'], corner_radius=12)
+        card.pack(fill='x', pady=(0, 10))
+        
+        inner = ctk.CTkFrame(card, fg_color="transparent")
+        inner.pack(fill='x', padx=15, pady=12)
+        
+        # Title
+        ctk.CTkLabel(inner, text=t("connection"),
+                    font=ctk.CTkFont(size=11, weight="bold"),
+                    text_color=self.colors['text_dim']).pack(anchor='w', pady=(0, 8))
+        
+        # Devices row
+        row = ctk.CTkFrame(inner, fg_color="transparent")
+        row.pack(fill='x')
+        
+        ctk.CTkLabel(row, text=t("devices"),
+                    font=ctk.CTkFont(size=12),
+                    text_color=self.colors['text_dim']).pack(side='left')
+        
+        self.clients_count = ctk.CTkLabel(row, text="0",
+                                          font=ctk.CTkFont(size=13, weight="bold"),
+                                          text_color=self.colors['accent'])
+        self.clients_count.pack(side='left', padx=(8, 0))
+        
+        self.clients_label = ctk.CTkLabel(inner, text=t("waiting_connection"),
+                                          font=ctk.CTkFont(size=11),
+                                          text_color=self.colors['text_dim'])
+        self.clients_label.pack(anchor='w', pady=(5, 0))
+    
+    def _build_qr_card(self, parent):
+        """QR code card"""
+        card = ctk.CTkFrame(parent, fg_color=self.colors['card'], corner_radius=12)
+        card.pack(fill='x', pady=(0, 10))
+        
+        inner = ctk.CTkFrame(card, fg_color="transparent")
+        inner.pack(fill='x', padx=15, pady=12)
+        
+        # Title
+        ctk.CTkLabel(inner, text=t("connect_qr"),
+                    font=ctk.CTkFont(size=11, weight="bold"),
+                    text_color=self.colors['text_dim']).pack(anchor='w', pady=(0, 10))
+        
+        # QR row
+        qr_row = ctk.CTkFrame(inner, fg_color="transparent")
+        qr_row.pack(fill='x')
+        
         ip = get_local_ip_sync()
         
-        ip_frame = tk.Frame(main, bg=COLORS['bg_dark'])
-        ip_frame.pack(pady=8)
-        tk.Label(ip_frame, text=ip, font=('Consolas', 18, 'bold'),
-                fg=COLORS['cyan'], bg=COLORS['bg_dark']).pack(side='left')
-        tk.Label(ip_frame, text=":8000", font=('Consolas', 14),
-                fg=COLORS['cyan_dim'], bg=COLORS['bg_dark']).pack(side='left')
-        
-        # ===== GAME & FPS DISPLAY =====
-        game_fps_frame = tk.Frame(main, bg=COLORS['bg_card'], pady=12)
-        game_fps_frame.pack(fill='x', pady=8)
-        
-        # Game name section
-        game_section = tk.Frame(game_fps_frame, bg=COLORS['bg_card'])
-        game_section.pack(side='left', expand=True, fill='x', padx=15)
-        tk.Label(game_section, text="🎮 GAME", font=('Segoe UI', 8),
-                fg=COLORS['text_dim'], bg=COLORS['bg_card']).pack()
-        self.game_label = tk.Label(game_section, text="Idle", font=('Segoe UI', 13, 'bold'),
-                                   fg=COLORS['text_dim'], bg=COLORS['bg_card'])
-        self.game_label.pack()
-        
-        # Separator
-        tk.Label(game_fps_frame, text="│", font=('Segoe UI', 24),
-                fg=COLORS['border'], bg=COLORS['bg_card']).pack(side='left')
-        
-        # FPS section
-        fps_section = tk.Frame(game_fps_frame, bg=COLORS['bg_card'])
-        fps_section.pack(side='left', expand=True, fill='x', padx=15)
-        tk.Label(fps_section, text="📊 FPS", font=('Segoe UI', 8),
-                fg=COLORS['text_dim'], bg=COLORS['bg_card']).pack()
-        self.fps_label = tk.Label(fps_section, text="0", font=('Impact', 28),
-                                  fg=COLORS['green'], bg=COLORS['bg_card'])
-        self.fps_label.pack()
-        
-        # ===== STATS CARDS =====
-        stats_frame = tk.Frame(main, bg=COLORS['bg_dark'])
-        stats_frame.pack(fill='x', pady=8)
-        
-        # CPU Card
-        cpu_card = tk.Frame(stats_frame, bg=COLORS['bg_card'], padx=15, pady=10)
-        cpu_card.pack(side='left', expand=True, fill='both', padx=3)
-        tk.Label(cpu_card, text="CPU", font=('Segoe UI', 9, 'bold'),
-                fg=COLORS['text_dim'], bg=COLORS['bg_card']).pack()
-        self.cpu_label = tk.Label(cpu_card, text="--%", font=('Segoe UI', 16, 'bold'),
-                                  fg=COLORS['cyan'], bg=COLORS['bg_card'])
-        self.cpu_label.pack()
-        
-        # GPU Card
-        gpu_card = tk.Frame(stats_frame, bg=COLORS['bg_card'], padx=15, pady=10)
-        gpu_card.pack(side='left', expand=True, fill='both', padx=3)
-        tk.Label(gpu_card, text="GPU", font=('Segoe UI', 9, 'bold'),
-                fg=COLORS['text_dim'], bg=COLORS['bg_card']).pack()
-        self.gpu_label = tk.Label(gpu_card, text="--%", font=('Segoe UI', 16, 'bold'),
-                                  fg=COLORS['cyan'], bg=COLORS['bg_card'])
-        self.gpu_label.pack()
-        
-        # RAM Card
-        ram_card = tk.Frame(stats_frame, bg=COLORS['bg_card'], padx=15, pady=10)
-        ram_card.pack(side='left', expand=True, fill='both', padx=3)
-        tk.Label(ram_card, text="RAM", font=('Segoe UI', 9, 'bold'),
-                fg=COLORS['text_dim'], bg=COLORS['bg_card']).pack()
-        self.ram_label = tk.Label(ram_card, text="--%", font=('Segoe UI', 16, 'bold'),
-                                  fg=COLORS['cyan'], bg=COLORS['bg_card'])
-        self.ram_label.pack()
-        
-        # ===== CONNECTED CLIENTS =====
-        clients_frame = tk.Frame(main, bg=COLORS['bg_card'], pady=10)
-        clients_frame.pack(fill='x', pady=8)
-        
-        clients_header = tk.Frame(clients_frame, bg=COLORS['bg_card'])
-        clients_header.pack(fill='x', padx=12)
-        
-        tk.Label(clients_header, text="📱 CONNECTED DEVICES", font=('Segoe UI', 10, 'bold'),
-                fg=COLORS['cyan'], bg=COLORS['bg_card']).pack(side='left')
-        
-        self.clients_count = tk.Label(clients_header, text="0", font=('Segoe UI', 14, 'bold'),
-                                      fg=COLORS['green'], bg=COLORS['bg_card'])
-        self.clients_count.pack(side='right')
-        
-        # Client list
-        list_frame = tk.Frame(clients_frame, bg=COLORS['bg_dark'], padx=12)
-        list_frame.pack(fill='x', pady=5)
-        
-        self.clients_listbox = tk.Listbox(list_frame, height=2, bg=COLORS['bg_dark'], fg=COLORS['text_dim'],
-                                          font=('Consolas', 9), relief='flat', 
-                                          highlightthickness=0, selectbackground=COLORS['bg_card'])
-        self.clients_listbox.pack(fill='x')
-        self.clients_listbox.insert(tk.END, "  Waiting for connections...")
-        
-        # ===== QR CODE =====
-        qr_frame = tk.Frame(main, bg=COLORS['bg_dark'])
-        qr_frame.pack(pady=10)
-        
         try:
-            qr_img = generate_qr_code(f"http://{ip}:8000", 110)
+            qr_img = generate_qr_code(f"http://{ip}:8000", 90)
             self.qr_photo = ImageTk.PhotoImage(qr_img)
-            qr_label = tk.Label(qr_frame, image=self.qr_photo, bg=COLORS['bg_dark'])
-            qr_label.pack()
+            
+            # QR container
+            qr_container = ctk.CTkFrame(qr_row, fg_color="white", corner_radius=8)
+            qr_container.pack(side='left')
+            
+            qr_label = tk.Label(qr_container, image=self.qr_photo, bg='white')
+            qr_label.pack(padx=5, pady=5)
+            
+            # Info
+            info = ctk.CTkFrame(qr_row, fg_color="transparent")
+            info.pack(side='left', padx=(15, 0))
+            
+            ctk.CTkLabel(info, text=t("scan_app"),
+                        font=ctk.CTkFont(size=11),
+                        text_color=self.colors['text_dim']).pack(anchor='w')
+            
+            ctk.CTkLabel(info, text="FrameForge",
+                        font=ctk.CTkFont(size=12, weight="bold"),
+                        text_color=self.colors['text']).pack(anchor='w')
+            
+            ctk.CTkLabel(info, text=f"{ip}:8000",
+                        font=ctk.CTkFont(family="Consolas", size=11),
+                        text_color=self.colors['accent']).pack(anchor='w', pady=(8, 0))
+                        
         except Exception as e:
-            tk.Label(qr_frame, text="[QR Code]", font=('Segoe UI', 10),
-                    fg=COLORS['text_dim'], bg=COLORS['bg_dark']).pack()
+            logger.error(f"QR Error: {e}")
+            ctk.CTkLabel(inner, text=t("error_qr"),
+                        text_color=self.colors['red']).pack()
+    
+    def _build_footer(self, parent):
+        """Footer with options"""
+        footer = ctk.CTkFrame(parent, fg_color="transparent")
+        footer.pack(fill='x', pady=(5, 0))
         
-        tk.Label(main, text="SCAN TO CONNECT", font=('Segoe UI', 9, 'bold'),
-                fg=COLORS['cyan'], bg=COLORS['bg_dark']).pack()
+        # Checkboxes
+        cb_row = ctk.CTkFrame(footer, fg_color="transparent")
+        cb_row.pack(anchor='w')
         
-        # ===== CHECKBOXES =====
-        check_frame = tk.Frame(main, bg=COLORS['bg_dark'])
-        check_frame.pack(fill='x', pady=8)
+        self.auto_start_var = ctk.BooleanVar(value=is_auto_start_enabled())
+        ctk.CTkCheckBox(cb_row, text=t("start_with_windows"),
+                       variable=self.auto_start_var,
+                       font=ctk.CTkFont(size=11),
+                       fg_color=self.colors['accent_steam'],
+                       hover_color=self.colors['accent_light'],
+                       command=self._toggle_auto_start).pack(side='left')
         
-        self.auto_start_var = tk.BooleanVar(value=is_auto_start_enabled())
-        auto_check = tk.Checkbutton(check_frame, text="  Start with Windows",
-                                    variable=self.auto_start_var, font=('Segoe UI', 10),
-                                    fg=COLORS['text_dim'], bg=COLORS['bg_dark'], selectcolor=COLORS['bg_card'],
-                                    activebackground=COLORS['bg_dark'], activeforeground=COLORS['cyan'],
-                                    cursor='hand2', command=self.toggle_auto_start)
-        auto_check.pack(anchor='center')
+        self.start_minimized_var = ctk.BooleanVar(value=self.config.get("start_minimized", False))
+        ctk.CTkCheckBox(cb_row, text=t("minimized"),
+                       variable=self.start_minimized_var,
+                       font=ctk.CTkFont(size=11),
+                       fg_color=self.colors['accent_steam'],
+                       hover_color=self.colors['accent_light'],
+                       command=self._toggle_start_minimized).pack(side='left', padx=(15, 0))
         
-        # ===== STOP SERVER BUTTON =====
-        stop_btn = tk.Button(main, text="⏹  STOP SERVER", font=('Segoe UI', 12, 'bold'),
-                            fg=COLORS['text'], bg=COLORS['red'], relief='flat', pady=12,
-                            cursor='hand2', activebackground='#dc2626', activeforeground='white',
-                            command=self.stop_server)
-        stop_btn.pack(fill='x', pady=10)
-        stop_btn.configure(borderwidth=0, highlightthickness=0)
+        # Buttons Row
+        btn_row = ctk.CTkFrame(footer, fg_color="transparent")
+        btn_row.pack(fill='x', pady=(12, 0))
         
-        # ===== VERSION =====
-        tk.Label(main, text=f"v{APP_VERSION}", font=('Segoe UI', 8),
-                fg=COLORS['text_dim'], bg=COLORS['bg_dark']).pack()
+        # Stop button
+        ctk.CTkButton(btn_row, text=t("stop_server"),
+                     font=ctk.CTkFont(size=12, weight="bold"),
+                     fg_color=self.colors['red'],
+                     hover_color="#dc2626",
+                     corner_radius=8,
+                     width=120,
+                     command=self.stop_server).pack(side='left', expand=True, padx=(0, 5))
+
+
         
-        # Start update loop
-        self.update_stats()
+
+    
+    def _schedule_queue_check(self):
+        try:
+            while True:
+                msg = self.queue.get_nowait()
+                if msg == "show":
+                    self.window.deiconify()
+                    self.window.lift()
+                    self.window.focus_force()
+                    self.is_open = True
+                elif msg == "hide":
+                    self.hide()
+                elif msg == "quit":
+                    self.stop_server()
+        except queue.Empty:
+            pass
         
-        self.window.mainloop()
+        if self.window:
+            self.window.after(100, self._schedule_queue_check)
+    
+    def check_queue(self):
+        self._schedule_queue_check()
+    
+    def start(self):
+        if self.window:
+            self.window.mainloop()
     
     def stop_server(self):
-        """Stop the server and close"""
         global monitoring_active
         monitoring_active = False
         self.hide()
         os._exit(0)
     
-    def toggle_auto_start(self):
+    def _toggle_auto_start(self):
         if self.auto_start_var.get():
             enable_auto_start()
         else:
             disable_auto_start()
     
+    def toggle_auto_start(self):
+        self._toggle_auto_start()
+    
+    def _toggle_start_minimized(self):
+        self.config["start_minimized"] = self.start_minimized_var.get()
+        save_config(self.config)
+    
+    def toggle_start_minimized(self):
+        self._toggle_start_minimized()
+        
+    def _toggle_theme(self):
+        new_theme = "light" if self.current_theme == "dark" else "dark"
+        self.current_theme = new_theme
+        self.config["theme"] = new_theme
+        save_config(self.config)
+        
+        # Update colors
+        self.colors = self.dark_colors if new_theme == "dark" else self.light_colors
+        ctk.set_appearance_mode(new_theme)
+        
+        # Show restart message
+        try:
+            messagebox.showinfo(t("theme_changed"), t("restart_msg"))
+        except:
+            pass
+    
+    def _update_stats(self):
+        if not self.window:
+            return
+        
+        try:
+            cpu = psutil.cpu_percent(interval=None)
+            ram = psutil.virtual_memory().percent
+            
+            self.cpu_label.configure(text=f"{int(cpu)}%")
+            self.ram_label.configure(text=f"{int(ram)}%")
+            
+            gpu_temp = server_stats.get('gpu_temp', 0)
+            self.gpu_label.configure(text=f"{int(gpu_temp)}°C" if gpu_temp else "--")
+            
+            fps = server_stats.get('fps', 0)
+            self.fps_label.configure(text=str(fps))
+            
+            # FPS color
+            if fps >= 60:
+                self.fps_label.configure(text_color=self.colors['green'])
+            elif fps >= 30:
+                self.fps_label.configure(text_color=self.colors['yellow'])
+            else:
+                self.fps_label.configure(text_color=self.colors['red'])
+            
+            # Clients
+            count = len(connected_clients)
+            self.clients_count.configure(text=str(count))
+            
+            # Connection Animation
+            if count > self.last_client_count:
+                # New client connected - Pulse effect
+                self.clients_count.configure(text_color=self.colors['green'])
+                self.window.after(500, lambda: self.clients_count.configure(text_color=self.colors['accent']))
+            self.last_client_count = count
+            
+            if connected_clients:
+                self.clients_label.configure(text=f"{count} {t('devices_connected')}",
+                                            text_color=self.colors['text'])
+            else:
+                self.clients_label.configure(text=t("waiting_connection"),
+                                            text_color=self.colors['text_dim'])
+            
+            # Update Game Name
+            game_name = server_stats.get("game", "")
+            if game_name:
+                self.game_card.pack(fill='x', pady=(0, 10), after=self.afterburner_card)
+                self.game_name_label.configure(text=game_name)
+            else:
+                self.game_card.pack_forget()
+                
+            # Update Afterburner Warning
+            afterburner_status = get_afterburner_status()
+            if afterburner_status == 'not-found':
+                self.afterburner_card.pack(fill='x', pady=(0, 10), after=self.main_frame.winfo_children()[2]) # After status card
+            else:
+                self.afterburner_card.pack_forget()
+            
+            self.window.after(1000, self._update_stats)
+        except Exception as e:
+            logger.error(f"Update error: {e}")
+    
     def update_stats(self):
-        if self.is_open and self.window:
-            try:
-                # Update CPU/GPU/RAM
-                cpu = psutil.cpu_percent(interval=None)
-                ram = psutil.virtual_memory().percent
-                
-                self.cpu_label.config(text=f"{int(cpu)}%")
-                self.ram_label.config(text=f"{int(ram)}%")
-                
-                gpu_temp = server_stats.get('gpu_temp', 0)
-                self.gpu_label.config(text=f"{int(gpu_temp)}°C" if gpu_temp else "--%")
-                
-                # Update FPS
-                fps = server_stats.get('fps', 0)
-                self.fps_label.config(text=str(fps))
-                
-                # Color FPS based on value
-                if fps >= 60:
-                    self.fps_label.config(fg=COLORS['green'])
-                elif fps >= 30:
-                    self.fps_label.config(fg=COLORS['yellow'])
-                else:
-                    self.fps_label.config(fg=COLORS['red'])
-                
-                # Update Game name
-                game = server_stats.get('game', '')
-                if game:
-                    display_name = game[:18] + "..." if len(game) > 18 else game
-                    self.game_label.config(text=display_name, fg=COLORS['green'])
-                else:
-                    self.game_label.config(text="Idle", fg=COLORS['text_dim'])
-                
-                # Update connected clients
-                client_count = len(connected_clients)
-                self.clients_count.config(text=str(client_count))
-                
-                # Update client list
-                self.clients_listbox.delete(0, tk.END)
-                if connected_clients:
-                    for sid in list(connected_clients)[:3]:
-                        self.clients_listbox.insert(tk.END, f"  📱 {sid[:20]}...")
-                else:
-                    self.clients_listbox.insert(tk.END, "  Waiting for connections...")
-                
-                self.window.after(1000, self.update_stats)
-            except:
-                pass
+        self._update_stats()
     
     def hide(self):
         if self.window:
             self.window.withdraw()
             self.is_open = False
+    
+    def open_donation_modal(self):
+        """Open donation modal with PayPal and PIX"""
+        modal = ctk.CTkToplevel(self.window)
+        modal.title(t("support_title"))
+        modal.geometry("400x600")
+        modal.resizable(False, False)
+        modal.transient(self.window)
+        modal.grab_set()
+        
+        # Center modal
+        modal.update_idletasks()
+        x = self.window.winfo_x() + (self.window.winfo_width() // 2) - (400 // 2)
+        y = self.window.winfo_y() + (self.window.winfo_height() // 2) - (600 // 2)
+        modal.geometry(f"+{x}+{y}")
+        
+        modal.configure(fg_color=self.colors['bg'])
+        
+        # Header
+        ctk.CTkLabel(modal, text=t("support_header"), 
+                     font=ctk.CTkFont(size=20, weight="bold"),
+                     text_color=self.colors['text_bright']).pack(pady=(20, 5))
+                     
+        ctk.CTkLabel(modal, text=t("support_desc"), 
+                     font=ctk.CTkFont(size=12),
+                     text_color=self.colors['text_dim']).pack(pady=(0, 15))
+        
+        # Tabs
+        tabview = ctk.CTkTabview(modal, width=360, height=450)
+        tabview.pack(pady=(0, 20))
+        
+        tabview.add("PIX")
+        tabview.add("PayPal")
+        
+        # ===== PIX TAB =====
+        pix_frame = tabview.tab("PIX")
+        
+        pix_key = "00020126410014BR.GOV.BCB.PIX0119ad1000rso@gmail.com5204000053039865802BR5925Ademir Martin Gonzales Ju6009SAO PAULO62140510iNlqO1pmCE6304C7B3"
+        
+        # Generate PIX QR
+        qr = qrcode.QRCode(box_size=5, border=2)
+        qr.add_data(pix_key)
+        qr.make(fit=True)
+        qr_img = qr.make_image(fill_color="black", back_color="white")
+        
+        img_byte_arr = io.BytesIO()
+        qr_img.save(img_byte_arr, format='PNG')
+        ctk_img = ctk.CTkImage(light_image=Image.open(io.BytesIO(img_byte_arr.getvalue())),
+                              dark_image=Image.open(io.BytesIO(img_byte_arr.getvalue())),
+                              size=(200, 200))
+                              
+        ctk.CTkLabel(pix_frame, text="", image=ctk_img).pack(pady=20)
+        
+        def copy_pix():
+            self.window.clipboard_clear()
+            self.window.clipboard_append(pix_key)
+            copy_btn.configure(text=t("copied"), fg_color=self.colors['green'])
+            self.window.after(2000, lambda: copy_btn.configure(text=t("copy_pix"), fg_color=self.colors['card']))
+            
+        copy_btn = ctk.CTkButton(pix_frame, text=t("copy_pix"),
+                                font=ctk.CTkFont(size=12, weight="bold"),
+                                fg_color=self.colors['card'], hover_color=self.colors['accent_steam'],
+                                height=40,
+                                command=copy_pix)
+        copy_btn.pack(fill='x', padx=20)
+        
+        ctk.CTkLabel(pix_frame, text="Ademir ***", 
+                     font=ctk.CTkFont(size=10),
+                     text_color=self.colors['text_dim']).pack(pady=(5, 0))
 
-gui = ServerGUI()
+        # ===== PAYPAL TAB =====
+        paypal_frame = tabview.tab("PayPal")
+        
+        paypal_url = "https://www.paypal.com/cgi-bin/webscr?cmd=_donations&business=frameforgeapp@gmail.com&currency_code=BRL&source=url"
+        
+        # Generate PayPal QR
+        qr_pp = qrcode.QRCode(box_size=5, border=2)
+        qr_pp.add_data(paypal_url)
+        qr_pp.make(fit=True)
+        qr_img_pp = qr_pp.make_image(fill_color="black", back_color="white")
+        
+        img_byte_arr_pp = io.BytesIO()
+        qr_img_pp.save(img_byte_arr_pp, format='PNG')
+        ctk_img_pp = ctk.CTkImage(light_image=Image.open(io.BytesIO(img_byte_arr_pp.getvalue())),
+                                 dark_image=Image.open(io.BytesIO(img_byte_arr_pp.getvalue())),
+                                 size=(200, 200))
+        
+        ctk.CTkLabel(paypal_frame, text="", image=ctk_img_pp).pack(pady=20)
+        
+        def open_paypal():
+            webbrowser.open(paypal_url)
+            
+        ctk.CTkButton(paypal_frame, text=t("open_browser"),
+                     font=ctk.CTkFont(size=12, weight="bold"),
+                     fg_color="#0070BA", hover_color="#003087",
+                     height=40,
+                     command=open_paypal).pack(fill='x', padx=20)
+                     
+        ctk.CTkLabel(paypal_frame, text=t("scan_to_donate"), 
+                     font=ctk.CTkFont(size=10),
+                     text_color=self.colors['text_dim']).pack(pady=(5, 0))
 
-def show_gui(icon=None, item=None):
-    threading.Thread(target=gui.show, daemon=True).start()
+        # ===== KO-FI TAB =====
+        tabview.add("Ko-fi")
+        kofi_frame = tabview.tab("Ko-fi")
+        
+        kofi_url = "https://ko-fi.com/frameforge"
+        
+        # Generate Ko-fi QR
+        qr_kf = qrcode.QRCode(box_size=5, border=2)
+        qr_kf.add_data(kofi_url)
+        qr_kf.make(fit=True)
+        qr_img_kf = qr_kf.make_image(fill_color="black", back_color="white")
+        
+        img_byte_arr_kf = io.BytesIO()
+        qr_img_kf.save(img_byte_arr_kf, format='PNG')
+        ctk_img_kf = ctk.CTkImage(light_image=Image.open(io.BytesIO(img_byte_arr_kf.getvalue())),
+                                 dark_image=Image.open(io.BytesIO(img_byte_arr_kf.getvalue())),
+                                 size=(200, 200))
+        
+        ctk.CTkLabel(kofi_frame, text="", image=ctk_img_kf).pack(pady=20)
+        
+        def open_kofi():
+            webbrowser.open(kofi_url)
+            
+        ctk.CTkButton(kofi_frame, text="☕ Buy me a Coffee",
+                     font=ctk.CTkFont(size=12, weight="bold"),
+                     fg_color="#FF5E5B", hover_color="#D94140", # Ko-fi red color
+                     height=40,
+                     command=open_kofi).pack(fill='x', padx=20)
+                     
+        ctk.CTkLabel(kofi_frame, text=t("scan_to_donate"), 
+                     font=ctk.CTkFont(size=10),
+                     text_color=self.colors['text_dim']).pack(pady=(5, 0))
 
-# ==================== SYSTEM TRAY ====================
+# ==================== MAIN ====================
 
 def create_tray_icon():
-    """Create clean, readable tray icon"""
-    icon_size = 64
-    image = Image.new('RGBA', (icon_size, icon_size), color=(0, 0, 0, 255))
-    from PIL import ImageDraw, ImageFont
-    draw = ImageDraw.Draw(image)
-    
-    # Draw a subtle cyan border/glow
-    for i in range(3):
-        alpha = 80 - i * 25
-        draw.rounded_rectangle(
-            [i, i, icon_size-1-i, icon_size-1-i], 
-            radius=8, 
-            outline=(0, 243, 255, alpha),
-            width=1
-        )
-    
-    # Draw FF text - simple and readable
+    """Create system tray icon with FF in TRON style"""
     try:
-        font = ImageFont.truetype("arial.ttf", 28)
+        # Try to load custom icon first
+        if getattr(sys, 'frozen', False):
+            if hasattr(sys, '_MEIPASS'):
+                icon_path = os.path.join(sys._MEIPASS, 'icon.ico')
+            else:
+                icon_path = os.path.join(os.path.dirname(sys.executable), 'icon.ico')
+        else:
+            icon_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'icon.ico')
+            
+        if os.path.exists(icon_path):
+            return Image.open(icon_path)
     except:
+        pass
+    
+    # Fallback: Create TRON-style FF icon
+    try:
+        from PIL import ImageDraw, ImageFont
+        
+        size = 64
+        # TRON colors
+        bg_color = (10, 15, 20)  # Dark background
+        cyan = (0, 255, 255)     # TRON cyan
+        
+        # Create image
+        img = Image.new('RGB', (size, size), bg_color)
+        draw = ImageDraw.Draw(img)
+        
+        # Try to use a bold font
         try:
-            font = ImageFont.truetype("arialbd.ttf", 28)
+            font = ImageFont.truetype("arialbd.ttf", 32)
         except:
-            font = ImageFont.load_default()
-    
-    # Center the text
-    text = "FF"
-    bbox = draw.textbbox((0, 0), text, font=font)
-    text_width = bbox[2] - bbox[0]
-    text_height = bbox[3] - bbox[1]
-    x = (icon_size - text_width) // 2
-    y = (icon_size - text_height) // 2 - 2
-    
-    # Solid cyan text - clean and readable
-    draw.text((x, y), text, fill=(0, 243, 255, 255), font=font)
-    
-    return image
+            try:
+                font = ImageFont.truetype("arial.ttf", 32)
+            except:
+                font = ImageFont.load_default()
+        
+        # Draw FF text centered
+        text = "FF"
+        bbox = draw.textbbox((0, 0), text, font=font)
+        text_width = bbox[2] - bbox[0]
+        text_height = bbox[3] - bbox[1]
+        x = (size - text_width) // 2
+        y = (size - text_height) // 2 - 4
+        
+        # Draw glow effect (multiple layers)
+        glow_color = (0, 180, 200)
+        for offset in range(3, 0, -1):
+            alpha = 100 - offset * 30
+            draw.text((x-offset, y), text, font=font, fill=glow_color)
+            draw.text((x+offset, y), text, font=font, fill=glow_color)
+            draw.text((x, y-offset), text, font=font, fill=glow_color)
+            draw.text((x, y+offset), text, font=font, fill=glow_color)
+        
+        # Draw main text
+        draw.text((x, y), text, font=font, fill=cyan)
+        
+        return img
+    except:
+        # Ultimate fallback
+        return Image.new('RGB', (64, 64), color=(0, 255, 255))
 
 def open_browser(icon=None, item=None):
     ip = get_local_ip_sync()
     webbrowser.open(f"http://{ip}:8000")
 
 def open_github(icon=None, item=None):
-    webbrowser.open(SERVER_URL)
+    webbrowser.open("https://github.com/frameforgeAPP/frameforge-server")
 
-def toggle_auto_start(icon, item):
+def toggle_auto_start_tray(icon, item):
     if is_auto_start_enabled():
         disable_auto_start()
     else:
         enable_auto_start()
 
-def quit_app(icon, item):
-    global monitoring_active
-    monitoring_active = False
-    icon.stop()
-    os._exit(0)
+def run_server_thread():
+    try:
+        logger.info("Starting Server Thread")
+        HOST = os.environ.get("FPS_HOST", "0.0.0.0")
+        PORT = int(os.environ.get("FPS_PORT", "8000"))
+        
+        # Completely disable uvicorn logging to avoid isatty() errors in frozen exe
+        log_config = {
+            "version": 1,
+            "disable_existing_loggers": True,
+            "handlers": {},
+            "loggers": {},
+        }
+        
+        config = uvicorn.Config(
+            socket_app, 
+            host=HOST, 
+            port=PORT, 
+            log_level="critical",
+            access_log=False,
+            log_config=log_config
+        )
+        server = uvicorn.Server(config)
+        server.run()
+    except Exception as e:
+        logger.error(f"Server Thread Failed: {e}", exc_info=True)
 
 def get_status_text():
-    ip = get_local_ip_sync()
-    clients = server_stats["clients"]
-    fps = server_stats["fps"]
-    return f"IP: {ip}:8000 | Clients: {clients} | FPS: {fps}"
+    return "FrameForge Server: Online"
 
-def run_tray():
-    icon_image = create_tray_icon()
-    
-    menu = pystray.Menu(
-        item(lambda text: get_status_text(), None, enabled=False),
-        item('─────────────', None, enabled=False),
-        item('Abrir Painel', show_gui, default=True),
-        item('Abrir no Navegador', open_browser),
-        item('GitHub / Updates', open_github),
-        item('─────────────', None, enabled=False),
-        item('Iniciar com Windows', toggle_auto_start, checked=lambda item: is_auto_start_enabled()),
-        item('─────────────', None, enabled=False),
-        item('Sair', quit_app)
-    )
-    
-    icon = pystray.Icon(APP_NAME, icon_image, APP_NAME, menu)
-    icon.run()
-
-# ==================== MAIN ====================
-
-def run_server():
-    HOST = os.environ.get("FPS_HOST", "0.0.0.0")
-    PORT = int(os.environ.get("FPS_PORT", "8000"))
-    
-    tray_thread = threading.Thread(target=run_tray, daemon=True)
-    tray_thread.start()
-    
-    config = uvicorn.Config(socket_app, host=HOST, port=PORT, log_level="error", access_log=False)
-    server = uvicorn.Server(config)
-    server.run()
+def run_tray(gui_ref):
+    try:
+        logger.info("Starting Tray Thread")
+        icon_image = create_tray_icon()
+        
+        def show_gui_action():
+            gui_ref.queue.put("show")
+            
+        def quit_action(icon):
+            gui_ref.queue.put("quit")
+            icon.stop()
+        
+        menu = pystray.Menu(
+            item(lambda text: get_status_text(), None, enabled=False),
+            item('─────────────', None, enabled=False),
+            item('Abrir Painel', show_gui_action, default=True),
+            item('Abrir no Navegador', open_browser),
+            item('GitHub / Updates', open_github),
+            item('─────────────', None, enabled=False),
+            item('Iniciar com Windows', toggle_auto_start_tray, checked=lambda item: is_auto_start_enabled()),
+            item('─────────────', None, enabled=False),
+            item('Sair', quit_action)
+        )
+        
+        icon = pystray.Icon(APP_NAME, icon_image, APP_NAME, menu)
+        icon.run()
+    except Exception as e:
+        logger.error(f"Tray Thread Failed: {e}", exc_info=True)
 
 if __name__ == "__main__":
-    run_server()
+    # Check if another instance is already running
+    if not check_single_instance():
+        show_already_running_message()
+        sys.exit(0)
+    
+    try:
+        logger.info("Application Starting")
+        # 1. Start Server in Background Thread
+        server_thread = threading.Thread(target=run_server_thread, daemon=True)
+        server_thread.start()
+        
+        # 2. Initialize GUI (Main Thread)
+        gui = ServerGUI()
+        
+        # 3. Start Tray in Background Thread
+        tray_thread = threading.Thread(target=run_tray, args=(gui,), daemon=True)
+        tray_thread.start()
+        
+        # 4. Show window if not minimized argument or config
+        config = load_config()
+        should_minimize = "--minimized" in sys.argv or config.get("start_minimized", False)
+        
+        if not should_minimize:
+            gui.queue.put("show")
+            
+        # 5. Start Main Loop (Blocking)
+        gui.start()
+    except Exception as e:
+        logger.critical(f"Main Loop Failed: {e}", exc_info=True)
+        # Show error box if possible
+        try:
+            ctypes.windll.user32.MessageBoxW(0, f"Critical Error: {e}", "FrameForge Server Error", 0x10)
+        except:
+            pass

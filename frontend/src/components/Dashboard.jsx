@@ -150,11 +150,11 @@ export default function Dashboard({ data, toggleFullScreen, isFullscreen, connec
         ...baseTheme,
         colors: {
             ...baseTheme.colors,
-            bg: isDarkMode ? baseTheme.colors.bg : "bg-gray-100",
+            bg: isDarkMode ? baseTheme.colors.bg : "bg-gray-50",
             panelBg: isDarkMode ? baseTheme.colors.panelBg : "bg-white",
-            text: isDarkMode ? baseTheme.colors.text : "text-gray-900",
-            border: isDarkMode ? baseTheme.colors.border : "border-gray-200",
-            grid: isDarkMode ? baseTheme.colors.grid : "rgba(0,0,0,0.1)"
+            text: isDarkMode ? baseTheme.colors.text : "text-gray-950",
+            border: isDarkMode ? baseTheme.colors.border : "border-gray-300",
+            grid: isDarkMode ? baseTheme.colors.grid : "rgba(0,0,0,0.15)"
         }
     };
 
@@ -601,7 +601,7 @@ export default function Dashboard({ data, toggleFullScreen, isFullscreen, connec
             </div>
 
             {/* MOBILE MENU (Bottom Bar) - Hidden until tap */}
-            <div className={`absolute bottom-4 left-1/2 -translate-x-1/2 z-40 flex gap-2 md:hidden bg-gray-900/80 px-3 py-1.5 rounded-full backdrop-blur-md border border-gray-700/50 transition-all duration-300 ${showControls ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4 pointer-events-none'}`}>
+            <div className={`absolute bottom-4 left-1/2 -translate-x-1/2 z-40 flex gap-4 md:hidden bg-gray-900/80 px-4 py-2 rounded-full backdrop-blur-md border border-gray-700/50 transition-all duration-300 ${showControls ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4 pointer-events-none'}`}>
                 {onReturnToConfig && (
                     <button onClick={onReturnToConfig} className="p-1.5 rounded-full text-cyan-400">
                         <Home size={18} />

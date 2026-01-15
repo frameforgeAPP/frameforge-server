@@ -8,8 +8,9 @@ export default function DonationModal({ onClose }) {
     const [activeTab, setActiveTab] = useState('pix');
 
     // REPLACE WITH YOUR ACTUAL PIX KEY
-    const pixKey = "00020126330014BR.GOV.BCB.PIX0111your-pix-key5204000053039865802BR5913Your Name6008City62070503***63041234";
-    const buyMeCoffeeUrl = "https://buymeacoffee.com/yourusername";
+    const pixKey = "00020126410014BR.GOV.BCB.PIX0119ad1000rso@gmail.com5204000053039865802BR5925Ademir Martin Gonzales Ju6009SAO PAULO62140510iNlqO1pmCE6304C7B3";
+    const displayPixKey = pixKey.substring(0, 60) + "..." + pixKey.substring(pixKey.length - 20); // Hide name completely in display
+    const buyMeCoffeeUrl = "https://www.paypal.com/cgi-bin/webscr?cmd=_donations&business=frameforgeapp@gmail.com&currency_code=BRL&source=url";
 
     const handleCopy = () => {
         navigator.clipboard.writeText(pixKey);
@@ -68,8 +69,8 @@ export default function DonationModal({ onClose }) {
                     <button
                         onClick={() => setActiveTab('pix')}
                         className={`flex-1 py-2 px-4 rounded-xl font-medium text-sm transition-all ${activeTab === 'pix'
-                                ? 'bg-gradient-to-r from-green-500 to-emerald-600 text-white shadow-lg shadow-green-500/30'
-                                : 'bg-gray-800/50 text-gray-400 hover:bg-gray-700/50'
+                            ? 'bg-gradient-to-r from-green-500 to-emerald-600 text-white shadow-lg shadow-green-500/30'
+                            : 'bg-gray-800/50 text-gray-400 hover:bg-gray-700/50'
                             }`}
                     >
                         🇧🇷 PIX
@@ -77,11 +78,11 @@ export default function DonationModal({ onClose }) {
                     <button
                         onClick={() => setActiveTab('coffee')}
                         className={`flex-1 py-2 px-4 rounded-xl font-medium text-sm transition-all ${activeTab === 'coffee'
-                                ? 'bg-gradient-to-r from-yellow-500 to-orange-500 text-white shadow-lg shadow-yellow-500/30'
-                                : 'bg-gray-800/50 text-gray-400 hover:bg-gray-700/50'
+                            ? 'bg-gradient-to-r from-blue-500 to-indigo-600 text-white shadow-lg shadow-blue-500/30'
+                            : 'bg-gray-800/50 text-gray-400 hover:bg-gray-700/50'
                             }`}
                     >
-                        ☕ Coffee
+                        💳 PayPal
                     </button>
                 </div>
 
@@ -102,15 +103,15 @@ export default function DonationModal({ onClose }) {
                             <div className="flex gap-2">
                                 <input
                                     type="text"
-                                    value={pixKey}
+                                    value={displayPixKey} // Uses masked version: "Ademir ***"
                                     readOnly
-                                    className="bg-gray-900/80 border border-gray-700 text-gray-400 text-xs rounded-xl px-3 py-3 w-full outline-none font-mono truncate"
+                                    className="bg-gray-900/80 border border-gray-700 text-gray-400 text-xs rounded-xl px-3 py-3 w-full outline-none font-mono truncate select-all"
                                 />
                                 <button
                                     onClick={handleCopy}
                                     className={`px-4 rounded-xl transition-all font-medium text-sm ${copied
-                                            ? 'bg-green-500 text-white'
-                                            : 'bg-gradient-to-r from-green-500 to-emerald-600 text-white hover:shadow-lg hover:shadow-green-500/30'
+                                        ? 'bg-green-500 text-white'
+                                        : 'bg-gradient-to-r from-green-500 to-emerald-600 text-white hover:shadow-lg hover:shadow-green-500/30'
                                         }`}
                                 >
                                     {copied ? <Check size={18} /> : <Copy size={18} />}
@@ -123,10 +124,10 @@ export default function DonationModal({ onClose }) {
                                 href={buyMeCoffeeUrl}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="flex items-center justify-center gap-3 py-4 bg-gradient-to-r from-yellow-400 to-orange-500 hover:from-yellow-300 hover:to-orange-400 text-gray-900 font-bold rounded-2xl transition-all hover:scale-[1.02] hover:shadow-lg hover:shadow-yellow-500/30"
+                                className="flex items-center justify-center gap-3 py-4 bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-400 hover:to-indigo-500 text-white font-bold rounded-2xl transition-all hover:scale-[1.02] hover:shadow-lg hover:shadow-blue-500/30"
                             >
                                 <Coffee size={22} />
-                                Buy me a Coffee
+                                Donate with PayPal
                                 <ExternalLink size={16} />
                             </a>
 
