@@ -1,13 +1,14 @@
 import React, { useRef, useState, useEffect } from 'react';
-import { Palette, X, Check, Image, Sparkles, Code, Flame, Upload, Sun, Moon, Zap, Droplets, Circle, Waves, Activity, Gamepad2, Lock, Unlock, Coffee } from 'lucide-react';
+import { Palette, X, Check, Image, Sparkles, Code, Flame, Upload, Sun, Moon, Zap, Droplets, Circle, Waves, Activity, Gamepad2, Lock, Unlock, Coffee, Clock } from 'lucide-react';
 import { themes } from '../utils/themes';
 import { t } from '../utils/i18n';
 
 // Define Premium Themes
-const PREMIUM_THEMES = ['cyberpunk', 'matrix', 'synthwave', 'neonOrange', 'roblox', 'minecraft'];
+const PREMIUM_THEMES = ['matrix', 'roblox', 'minecraft'];
+const PREMIUM_BACKGROUNDS = ['matrix', 'embers', 'rain']; // Free: none, stars, particles
 const PRO_CODE = "FF-PRO-2026"; // Simple hardcoded code for v1.0
 
-export default function ThemeSelector({ currentTheme, onSelectTheme, onClose, currentBackground, onSelectBackground, onUploadBackground, globalSettings, onUpdateGlobalSettings }) {
+export default function ThemeSelector({ currentTheme, onSelectTheme, onClose, currentBackground, onSelectBackground, onUploadBackground, globalSettings, onUpdateGlobalSettings, isDarkMode, onToggleDarkMode, onOpenClock, customColors, onUpdateCustomColor, hardwareLabels, onUpdateHardwareLabel }) {
     const fileInputRef = useRef(null);
     const [isPro, setIsPro] = useState(false);
     const [showUnlockModal, setShowUnlockModal] = useState(false);
@@ -28,34 +29,42 @@ export default function ThemeSelector({ currentTheme, onSelectTheme, onClose, cu
             setIsPro(true);
             setShowUnlockModal(false);
             setUnlockCode("");
+            alert("Funcionalidades Premium desbloqueadas com sucesso!");
         } else {
             setUnlockError("Código inválido. Tente novamente.");
         }
     };
 
     const handleThemeClick = (key) => {
-        if (PREMIUM_THEMES.includes(key) && !isPro) {
+        // Custom theme is now a PREMIUM feature
+        if ((PREMIUM_THEMES.includes(key) || key === 'custom') && !isPro) {
             setShowUnlockModal(true);
         } else {
             onSelectTheme(key);
         }
     };
 
+    const handleRgbToggle = () => {
+        if (!isPro) {
+            setShowUnlockModal(true);
+        } else {
+            onUpdateGlobalSettings && onUpdateGlobalSettings('rgbBorder', !globalSettings?.rgbBorder);
+        }
+    };
+
     const backgrounds = [
         { id: 'none', name: 'None', icon: X },
+        { id: 'stars', name: 'Stars', icon: Sparkles },
+        { id: 'particles', name: 'Particles', icon: Circle },
         { id: 'matrix', name: 'Matrix', icon: Code },
         { id: 'embers', name: 'Embers', icon: Flame },
-        { id: 'stars', name: 'Stars', icon: Sparkles },
         { id: 'rain', name: 'Rain', icon: Droplets },
-        { id: 'particles', name: 'Particles', icon: Circle },
-        { id: 'gradient', name: 'Gradient', icon: Waves },
-        { id: 'pulse', name: 'Pulse', icon: Activity },
         { id: 'custom', name: 'Custom', icon: Image },
     ];
 
     // Categorize themes
     const themeCategories = {
-        'Escuros': ['default', 'redDragon', 'midnightPurple', 'carbonBlack', 'neonOrange', 'matrix', 'synthwave'],
+        'Escuros': ['default', 'redDragon', 'midnightPurple', 'carbonBlack', 'matrix', 'synthwave'],
         'Claros': ['cyberpunk', 'barbie'],
         'Gaming': ['minecraft', 'roblox', 'pixel'],
         'Especiais': ['custom']
@@ -103,7 +112,7 @@ export default function ThemeSelector({ currentTheme, onSelectTheme, onClose, cu
                 </button>
 
                 {/* Header */}
-                <div className="text-center mb-6">
+                <div className="text-center mb-6 relative">
                     <div className="inline-flex items-center justify-center p-3 bg-cyan-500/10 rounded-full mb-3">
                         <Palette className="text-cyan-500 animate-pulse" size={28} />
                     </div>
@@ -111,8 +120,30 @@ export default function ThemeSelector({ currentTheme, onSelectTheme, onClose, cu
                     <p className="text-gray-400 text-sm">
                         {t('select_theme_desc')}
                     </p>
+
+                    {/* Quick Actions Row */}
+                    <div className="flex items-center justify-center gap-4 mt-4">
+                        {/* Dark/Light Toggle */}
+                        <button
+                            onClick={onToggleDarkMode}
+                            className={`flex items-center gap-2 px-3 py-1.5 rounded-full border transition-all ${isDarkMode ? 'bg-gray-800 border-gray-700 text-yellow-400' : 'bg-gray-100 border-gray-300 text-orange-500'}`}
+                        >
+                            {isDarkMode ? <Moon size={14} /> : <Sun size={14} />}
+                            <span className="text-xs font-bold">{isDarkMode ? 'Escuro' : 'Claro'}</span>
+                        </button>
+
+                        {/* Open Clock Button */}
+                        <button
+                            onClick={onOpenClock}
+                            className="flex items-center gap-2 px-3 py-1.5 rounded-full border border-blue-500/30 bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 transition-all"
+                        >
+                            <Clock size={14} />
+                            <span className="text-xs font-bold">Abrir Relógio</span>
+                        </button>
+                    </div>
+
                     {!isPro && (
-                        <div className="mt-2 inline-flex items-center gap-2 px-3 py-1 rounded-full bg-yellow-500/10 border border-yellow-500/30 text-yellow-400 text-xs font-bold cursor-pointer hover:bg-yellow-500/20" onClick={() => setShowUnlockModal(true)}>
+                        <div className="mt-4 inline-flex items-center gap-2 px-3 py-1 rounded-full bg-yellow-500/10 border border-yellow-500/30 text-yellow-400 text-xs font-bold cursor-pointer hover:bg-yellow-500/20" onClick={() => setShowUnlockModal(true)}>
                             <Lock size={12} />
                             Desbloquear Temas Premium
                         </div>
@@ -133,7 +164,7 @@ export default function ThemeSelector({ currentTheme, onSelectTheme, onClose, cu
                             {themeKeys.filter(key => themes[key]).map((key) => {
                                 const theme = themes[key];
                                 const isActive = currentTheme === key;
-                                const isPremium = PREMIUM_THEMES.includes(key);
+                                const isPremium = PREMIUM_THEMES.includes(key) || key === 'custom';
                                 const isLocked = isPremium && !isPro;
                                 const previewColors = getThemePreviewColors(theme);
 
@@ -216,6 +247,12 @@ export default function ThemeSelector({ currentTheme, onSelectTheme, onClose, cu
                             <button
                                 key={bg.id}
                                 onClick={() => {
+                                    const isPremiumBg = PREMIUM_BACKGROUNDS.includes(bg.id) || bg.id === 'custom';
+                                    if (isPremiumBg && !isPro) {
+                                        setShowUnlockModal(true);
+                                        return;
+                                    }
+
                                     if (bg.id === 'custom') {
                                         fileInputRef.current?.click();
                                     } else {
@@ -226,10 +263,19 @@ export default function ThemeSelector({ currentTheme, onSelectTheme, onClose, cu
                                     ${isActive
                                         ? 'border-cyan-500 bg-cyan-500/10'
                                         : 'border-gray-800 hover:border-gray-600 hover:bg-gray-800/50'
-                                    }`}
+                                    }
+                                    ${(PREMIUM_BACKGROUNDS.includes(bg.id) || bg.id === 'custom') && !isPro ? 'opacity-75 grayscale-[0.5]' : ''}
+                                    `}
                             >
                                 <Icon size={20} className={isActive ? 'text-cyan-400' : 'text-gray-500'} />
                                 <span className={`text-xs font-bold ${isActive ? 'text-cyan-400' : 'text-gray-400'}`}>{bg.name}</span>
+
+                                {/* Lock Icon for Premium Backgrounds */}
+                                {(PREMIUM_BACKGROUNDS.includes(bg.id) || bg.id === 'custom') && !isPro && (
+                                    <div className="absolute top-1 right-1">
+                                        <Lock size={10} className="text-yellow-500" />
+                                    </div>
+                                )}
 
                                 {bg.id === 'custom' && (
                                     <input
@@ -245,42 +291,40 @@ export default function ThemeSelector({ currentTheme, onSelectTheme, onClose, cu
                     })}
                 </div>
 
-                {/* Global Color Overrides */}
+
+
+
+                {/* Hardware Renaming */}
                 <h3 className="text-sm font-bold text-gray-400 uppercase tracking-wider mb-3 flex items-center gap-2">
-                    <Palette size={14} />
-                    Cores Globais
+                    <span className="w-1 h-4 bg-yellow-500 rounded-full"></span>
+                    Renomear Hardware
                 </h3>
-                <div className="grid grid-cols-3 gap-4 mb-4">
-                    {/* Accent Color */}
+                <div className="grid grid-cols-3 gap-4 mb-6">
                     <div className="flex flex-col gap-2">
-                        <label className="text-xs text-gray-500">Destaque</label>
-                        <div className="relative">
-                            <input
-                                type="color"
-                                value={globalSettings?.accent || '#3b82f6'}
-                                className="w-full h-10 rounded-lg cursor-pointer border-2 border-gray-700"
-                                onChange={(e) => onUpdateGlobalSettings && onUpdateGlobalSettings('accent', e.target.value)}
-                            />
-                        </div>
-                    </div>
-                    {/* Text Color */}
-                    <div className="flex flex-col gap-2">
-                        <label className="text-xs text-gray-500">Texto</label>
+                        <label className="text-xs text-gray-500">CPU</label>
                         <input
-                            type="color"
-                            value={globalSettings?.text || '#ffffff'}
-                            className="w-full h-10 rounded-lg cursor-pointer border-2 border-gray-700"
-                            onChange={(e) => onUpdateGlobalSettings && onUpdateGlobalSettings('text', e.target.value)}
+                            type="text"
+                            value={hardwareLabels?.cpu || 'CPU'}
+                            onChange={(e) => onUpdateHardwareLabel && onUpdateHardwareLabel('cpu', e.target.value)}
+                            className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-yellow-500"
                         />
                     </div>
-                    {/* Background Color */}
                     <div className="flex flex-col gap-2">
-                        <label className="text-xs text-gray-500">Fundo</label>
+                        <label className="text-xs text-gray-500">GPU</label>
                         <input
-                            type="color"
-                            value={globalSettings?.bg || '#111827'}
-                            className="w-full h-10 rounded-lg cursor-pointer border-2 border-gray-700"
-                            onChange={(e) => onUpdateGlobalSettings && onUpdateGlobalSettings('bg', e.target.value)}
+                            type="text"
+                            value={hardwareLabels?.gpu || 'GPU'}
+                            onChange={(e) => onUpdateHardwareLabel && onUpdateHardwareLabel('gpu', e.target.value)}
+                            className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-yellow-500"
+                        />
+                    </div>
+                    <div className="flex flex-col gap-2">
+                        <label className="text-xs text-gray-500">RAM</label>
+                        <input
+                            type="text"
+                            value={hardwareLabels?.ram || 'RAM'}
+                            onChange={(e) => onUpdateHardwareLabel && onUpdateHardwareLabel('ram', e.target.value)}
+                            className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-yellow-500"
                         />
                     </div>
                 </div>
@@ -291,14 +335,35 @@ export default function ThemeSelector({ currentTheme, onSelectTheme, onClose, cu
                         <div className="w-8 h-8 rounded-lg bg-gradient-to-r from-red-500 via-green-500 to-blue-500 animate-pulse" />
                         <div>
                             <div className="text-sm font-bold text-white">RGB Borda</div>
-                            <div className="text-xs text-gray-500">Borda animada nos painéis</div>
+                            <div className="text-xs text-gray-500">Borda animada nos painéis {!isPro && <span className="text-yellow-500 font-bold">(PRO)</span>}</div>
                         </div>
                     </div>
                     <button
-                        onClick={() => onUpdateGlobalSettings && onUpdateGlobalSettings('rgbBorder', !globalSettings?.rgbBorder)}
+                        onClick={handleRgbToggle}
                         className={`relative w-12 h-6 rounded-full transition-all ${globalSettings?.rgbBorder ? 'bg-gradient-to-r from-red-500 via-green-500 to-blue-500' : 'bg-gray-700'}`}
                     >
                         <div className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-all ${globalSettings?.rgbBorder ? 'left-7' : 'left-1'}`} />
+                        {!isPro && !globalSettings?.rgbBorder && (
+                            <Lock size={10} className="absolute top-1.5 left-1.5 text-gray-400" />
+                        )}
+                    </button>
+                </div>
+
+                {/* Clock After Game Toggle */}
+                <div className="flex items-center justify-between p-3 bg-gray-800/50 rounded-xl border border-gray-700 mb-4">
+                    <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-lg bg-blue-500/20 flex items-center justify-center">
+                            <Clock className="text-blue-400" size={18} />
+                        </div>
+                        <div>
+                            <div className="text-sm font-bold text-white">Relógio Digital</div>
+                        </div>
+                    </div>
+                    <button
+                        onClick={() => onUpdateGlobalSettings && onUpdateGlobalSettings('clockAfterGame', !globalSettings?.clockAfterGame)}
+                        className={`relative w-12 h-6 rounded-full transition-all ${globalSettings?.clockAfterGame ? 'bg-blue-500' : 'bg-gray-700'}`}
+                    >
+                        <div className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-all ${globalSettings?.clockAfterGame ? 'left-7' : 'left-1'}`} />
                     </button>
                 </div>
 
@@ -313,8 +378,6 @@ export default function ThemeSelector({ currentTheme, onSelectTheme, onClose, cu
                         { id: 'pixel', name: 'Pixel', preview: "'Press Start 2P'", class: 'font-pixel' },
                         { id: 'minecraft', name: 'Minecraft', preview: "'Silkscreen'", class: 'font-minecraft' },
                         { id: 'roblox', name: 'Roblox', preview: "'Pixelify Sans'", class: 'font-roblox' },
-                        { id: 'mono', name: 'Monospace', preview: "'Consolas', monospace", class: 'font-mono' },
-                        { id: 'rounded', name: 'Arredondada', preview: "'Nunito', sans-serif", class: 'font-sans' },
                     ].map(font => (
                         <button
                             key={font.id}
@@ -337,78 +400,81 @@ export default function ThemeSelector({ currentTheme, onSelectTheme, onClose, cu
             </div>
 
             {/* UNLOCK MODAL */}
-            {showUnlockModal && (
-                <div className="fixed inset-0 z-[110] bg-black/95 backdrop-blur-xl flex items-center justify-center p-4">
-                    <div className="bg-gray-900 border border-yellow-500/30 rounded-2xl p-8 max-w-md w-full text-center relative shadow-2xl shadow-yellow-500/10">
-                        <button
-                            onClick={() => setShowUnlockModal(false)}
-                            className="absolute top-4 right-4 text-gray-500 hover:text-white transition-colors"
-                        >
-                            <X size={24} />
-                        </button>
-
-                        <div className="inline-flex items-center justify-center p-4 bg-yellow-500/10 rounded-full mb-6">
-                            <Lock className="text-yellow-500" size={48} />
-                        </div>
-
-                        <h2 className="text-2xl font-bold text-white mb-2">Desbloquear Versão PRO</h2>
-                        <p className="text-gray-400 mb-6">
-                            Tenha acesso vitalício a todos os temas Premium (Cyberpunk, Matrix, Neon, etc) e apoie o desenvolvimento!
-                        </p>
-
-                        <div className="bg-gray-800/50 rounded-xl p-4 mb-6 border border-gray-700">
-                            <div className="text-sm text-gray-400 mb-1">Valor Único</div>
-                            <div className="text-3xl font-bold text-white">R$ 14,90</div>
-                            <div className="text-xs text-green-400 mt-1">Acesso Vitalício</div>
-                        </div>
-
-                        <a
-                            href="https://ko-fi.com/frameforge"
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="flex items-center justify-center gap-2 w-full bg-[#FF5E5B] hover:bg-[#D94140] text-white font-bold py-3 px-6 rounded-xl transition-all mb-4"
-                        >
-                            <Coffee size={20} />
-                            Comprar Licença Agora
-                        </a>
-
-                        <div className="relative mb-2">
-                            <div className="absolute inset-0 flex items-center">
-                                <div className="w-full border-t border-gray-700"></div>
-                            </div>
-                            <div className="relative flex justify-center text-sm">
-                                <span className="px-2 bg-gray-900 text-gray-500">Já tem um código?</span>
-                            </div>
-                        </div>
-
-                        <div className="flex gap-2">
-                            <input
-                                type="text"
-                                placeholder="Cole seu código aqui..."
-                                className="flex-1 bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-yellow-500"
-                                value={unlockCode}
-                                onChange={(e) => {
-                                    setUnlockCode(e.target.value);
-                                    setUnlockError("");
-                                }}
-                            />
+            {
+                showUnlockModal && (
+                    <div className="fixed inset-0 z-[110] bg-black/95 backdrop-blur-xl flex items-center justify-center p-4" onClick={(e) => e.stopPropagation()}>
+                        <div className="bg-gray-900 border border-yellow-500/30 rounded-2xl p-8 max-w-md w-full text-center relative shadow-2xl shadow-yellow-500/10">
                             <button
-                                onClick={handleUnlock}
-                                className="bg-yellow-500 hover:bg-yellow-600 text-black font-bold px-4 py-2 rounded-lg transition-colors"
+                                onClick={() => setShowUnlockModal(false)}
+                                className="absolute top-4 right-4 text-gray-500 hover:text-white transition-colors"
                             >
-                                <Unlock size={18} />
+                                <X size={24} />
                             </button>
-                        </div>
-                        {unlockError && (
-                            <p className="text-red-500 text-xs mt-2 text-left">{unlockError}</p>
-                        )}
 
-                        <p className="text-[10px] text-gray-600 mt-6">
-                            Após o pagamento, enviaremos o código para seu e-mail.
-                        </p>
+                            <div className="inline-flex items-center justify-center p-4 bg-yellow-500/10 rounded-full mb-6">
+                                <Lock className="text-yellow-500" size={48} />
+                            </div>
+
+                            <h2 className="text-2xl font-bold text-white mb-2">Desbloquear Versão PRO</h2>
+                            <p className="text-gray-400 mb-6">
+                                Tenha acesso vitalício a todos os temas Premium, Borda RGB, Alertas e muito mais!
+                            </p>
+
+                            <div className="bg-gray-800/50 rounded-xl p-4 mb-6 border border-gray-700">
+                                <div className="text-sm text-gray-400 mb-1">Acesso Total</div>
+                                <div className="text-3xl font-bold text-white">R$ 14,99</div>
+                                <div className="text-xs text-green-400 mt-1">Vitalício</div>
+                            </div>
+
+                            <a
+                                href="https://ko-fi.com/frameforge"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="flex items-center justify-center gap-2 w-full bg-[#FF5E5B] hover:bg-[#D94140] text-white font-bold py-3 px-6 rounded-xl transition-all mb-4"
+                            >
+                                <Coffee size={20} />
+                                Comprar Licença Agora
+                            </a>
+
+                            <div className="relative mb-2">
+                                <div className="absolute inset-0 flex items-center">
+                                    <div className="w-full border-t border-gray-700"></div>
+                                </div>
+                                <div className="relative flex justify-center text-sm">
+                                    <span className="px-2 bg-gray-900 text-gray-500">Já tem um código?</span>
+                                </div>
+                            </div>
+
+                            <div className="flex gap-2">
+                                <input
+                                    type="text"
+                                    autoFocus
+                                    placeholder="Cole seu código aqui..."
+                                    className="flex-1 bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-yellow-500 uppercase"
+                                    value={unlockCode}
+                                    onChange={(e) => {
+                                        setUnlockCode(e.target.value.toUpperCase());
+                                        setUnlockError("");
+                                    }}
+                                />
+                                <button
+                                    onClick={handleUnlock}
+                                    className="bg-yellow-500 hover:bg-yellow-600 text-black font-bold px-4 py-2 rounded-lg transition-colors"
+                                >
+                                    <Unlock size={18} />
+                                </button>
+                            </div>
+                            {unlockError && (
+                                <p className="text-red-500 text-xs mt-2 text-left">{unlockError}</p>
+                            )}
+
+                            <p className="text-[10px] text-gray-600 mt-6">
+                                Após o pagamento, enviaremos o código para seu e-mail.
+                            </p>
+                        </div>
                     </div>
-                </div>
-            )}
-        </div>
+                )
+            }
+        </div >
     );
 }

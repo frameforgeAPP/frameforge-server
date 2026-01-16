@@ -14,24 +14,24 @@ const TUTORIAL_STEPS = [
         highlight: 'fps-panel'
     },
     {
-        id: 'cpu',
+        id: 'hardware',
         icon: Cpu,
         iconColor: 'text-orange-400',
-        title: 'Temperatura da CPU',
-        titleEn: 'CPU Temperature',
-        description: 'Monitore a temperatura do processador. O ideal é ficar abaixo de 80°C.',
-        descriptionEn: 'Monitor your processor temperature. Ideally it should stay below 80°C.',
+        title: 'Monitoramento de Hardware',
+        titleEn: 'Hardware Monitoring',
+        description: 'Acompanhe a temperatura e uso da CPU, GPU e RAM. Clique nos cards para renomear.',
+        descriptionEn: 'Track CPU, GPU and RAM temperature and usage. Click on cards to rename.',
         highlight: 'cpu-panel'
     },
     {
-        id: 'gpu',
-        icon: CircuitBoard,
-        iconColor: 'text-green-400',
-        title: 'Temperatura da GPU',
-        titleEn: 'GPU Temperature',
-        description: 'Veja a temperatura da placa de vídeo. Alertas são ativados se passar do limite.',
-        descriptionEn: 'See your graphics card temperature. Alerts are triggered if it exceeds the limit.',
-        highlight: 'gpu-panel'
+        id: 'customization',
+        icon: Palette,
+        iconColor: 'text-purple-400',
+        title: 'Personalização Total',
+        titleEn: 'Total Customization',
+        description: 'Escolha temas, fundos animados e cores individuais para cada componente.',
+        descriptionEn: 'Choose themes, animated backgrounds and individual colors for each component.',
+        highlight: null
     },
     {
         id: 'nav',
@@ -39,20 +39,11 @@ const TUTORIAL_STEPS = [
         iconColor: 'text-blue-400',
         title: 'Menu de Navegação',
         titleEn: 'Navigation Menu',
-        description: 'Toque na tela para abrir o menu. Acesse temas, histórico, alertas e muito mais!',
-        descriptionEn: 'Tap the screen to open the menu. Access themes, history, alerts and more!',
+        description: 'Toque na tela para abrir o menu. Acesse temas, alertas e muito mais!',
+        descriptionEn: 'Tap the screen to open the menu. Access themes, alerts and more!',
         highlight: null
     },
-    {
-        id: 'themes',
-        icon: Palette,
-        iconColor: 'text-purple-400',
-        title: 'Personalize Seu Tema',
-        titleEn: 'Customize Your Theme',
-        description: 'Escolha entre vários temas visuais e fundos animados. Deixe do seu jeito!',
-        descriptionEn: 'Choose from various visual themes and animated backgrounds. Make it your own!',
-        highlight: null
-    }
+
 ];
 
 export default function TutorialOverlay({ isOpen, onComplete }) {
@@ -136,8 +127,8 @@ export default function TutorialOverlay({ isOpen, onComplete }) {
                             onClick={handlePrev}
                             disabled={isFirst}
                             className={`flex items-center gap-1 px-4 py-2 rounded-lg transition-colors ${isFirst
-                                    ? 'text-gray-600 cursor-not-allowed'
-                                    : 'text-gray-400 hover:text-white hover:bg-gray-800'
+                                ? 'text-gray-600 cursor-not-allowed'
+                                : 'text-gray-400 hover:text-white hover:bg-gray-800'
                                 }`}
                         >
                             <ChevronLeft className="w-4 h-4" />
@@ -150,10 +141,10 @@ export default function TutorialOverlay({ isOpen, onComplete }) {
                                 <div
                                     key={index}
                                     className={`w-2 h-2 rounded-full transition-colors ${index === currentStep
-                                            ? 'bg-blue-500'
-                                            : index < currentStep
-                                                ? 'bg-green-500'
-                                                : 'bg-gray-700'
+                                        ? 'bg-blue-500'
+                                        : index < currentStep
+                                            ? 'bg-green-500'
+                                            : 'bg-gray-700'
                                         }`}
                                 />
                             ))}

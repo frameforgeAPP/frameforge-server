@@ -47,7 +47,7 @@ export default function SessionHistory({ isOpen, onClose, onSelectSession, onCom
     if (!isOpen) return null;
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
             <div className="bg-gray-900 border border-gray-800 rounded-2xl max-w-lg w-full max-h-[85vh] overflow-hidden flex flex-col">
                 {/* Header */}
                 <div className="flex items-center justify-between p-6 border-b border-gray-800">
@@ -105,8 +105,8 @@ export default function SessionHistory({ isOpen, onClose, onSelectSession, onCom
                                     key={session.id}
                                     onClick={() => compareMode ? toggleCompareSelection(session) : onSelectSession?.(session)}
                                     className={`p-4 rounded-xl border transition-all cursor-pointer ${isSelected
-                                            ? 'bg-purple-600/20 border-purple-500'
-                                            : 'bg-gray-800/50 border-gray-700 hover:border-gray-600'
+                                        ? 'bg-purple-600/20 border-purple-500'
+                                        : 'bg-gray-800/50 border-gray-700 hover:border-gray-600'
                                         }`}
                                 >
                                     {/* Game Name & Date */}

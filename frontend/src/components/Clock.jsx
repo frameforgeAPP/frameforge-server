@@ -170,14 +170,7 @@ export default function Clock({ toggleFullScreen, serverAddress, setServerAddres
         >
             {/* Controls - hidden by default, show on tap */}
             <div className={`absolute inset-0 z-40 pointer-events-none transition-opacity duration-300 ${showControls ? 'opacity-100' : 'opacity-0'}`}>
-                {/* Back Button */}
-                <button
-                    onClick={handleBack}
-                    className={`absolute left-6 top-6 p-3 bg-gray-800/70 hover:bg-gray-700 rounded-full text-gray-300 hover:text-white transition-all backdrop-blur-sm border border-gray-700/50 pointer-events-auto flex items-center gap-2 ${showControls ? '' : 'pointer-events-none'}`}
-                >
-                    <ArrowLeft size={24} />
-                    <span className="text-sm font-medium pr-1">Voltar</span>
-                </button>
+
 
                 {/* Close Button (same as back) */}
                 <button
@@ -185,6 +178,15 @@ export default function Clock({ toggleFullScreen, serverAddress, setServerAddres
                     className={`absolute right-6 top-6 p-3 bg-gray-800/70 hover:bg-gray-700 rounded-full text-gray-300 hover:text-white transition-all backdrop-blur-sm border border-gray-700/50 pointer-events-auto ${showControls ? '' : 'pointer-events-none'}`}
                 >
                     <X size={24} />
+                </button>
+
+                {/* Monitor Button */}
+                <button
+                    onClick={handleBack}
+                    className={`absolute left-6 bottom-6 p-3 bg-gray-800/70 hover:bg-gray-700 rounded-full text-gray-400 hover:text-white transition-all backdrop-blur-sm border border-gray-700/50 pointer-events-auto flex items-center gap-2 ${showControls ? '' : 'pointer-events-none'}`}
+                >
+                    <ArrowLeft size={24} />
+                    <span className="text-sm font-medium pr-1">Monitor</span>
                 </button>
 
                 {/* Settings Button */}

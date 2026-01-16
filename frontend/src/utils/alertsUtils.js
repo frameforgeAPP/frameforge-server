@@ -10,7 +10,10 @@ const DEFAULT_ALERTS = {
     fpsLowLimit: 30,
     vibrate: true,
     sound: false,
-    cooldownSeconds: 30
+    cooldownSeconds: 30,
+    cpuAlertEnabled: true,
+    gpuAlertEnabled: true,
+    fpsAlertEnabled: true
 };
 
 export const getAlertsSettings = () => {

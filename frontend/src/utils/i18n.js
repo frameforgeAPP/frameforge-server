@@ -116,6 +116,16 @@ const translations = {
         "offline_message": "Check your Wi-Fi or network connection",
         "retry": "Retry",
         "install_afterburner_rivatuner": "Install/Open MSI Afterburner and RivaTuner on your PC to see FPS and CPU Temp",
+
+        // Donation
+        "support_frameforge": "Support FrameForge",
+        "donation_description": "Your donation helps keep the app free and with constant updates!",
+        "faster_updates": "Updates",
+        "new_themes": "Themes",
+        "exclusive": "Exclusive",
+        "scan_pix": "Scan or copy the PIX key",
+        "international_payments": "For international payments",
+        "thanks_support": "Thanks for supporting!",
     },
     pt: {
         // Connection Screen
@@ -229,6 +239,16 @@ const translations = {
         "offline_message": "Verifique sua conexão Wi-Fi ou rede",
         "retry": "Tentar Novamente",
         "install_afterburner_rivatuner": "Instale/Abra o MSI Afterburner e o RivaTuner no seu computador para ver o FPS e Temp do CPU",
+
+        // Donation
+        "support_frameforge": "Apoie o FrameForge",
+        "donation_description": "Sua doação ajuda a manter o app gratuito e com atualizações constantes!",
+        "faster_updates": "Updates",
+        "new_themes": "Temas",
+        "exclusive": "Exclusivo",
+        "scan_pix": "Escaneie ou copie a chave PIX",
+        "international_payments": "Para pagamentos internacionais",
+        "thanks_support": "Obrigado por apoiar!",
     }
 };
 

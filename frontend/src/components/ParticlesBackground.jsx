@@ -56,22 +56,24 @@ export default function ParticlesBackground() {
 
             // Draw connections
             ctx.shadowBlur = 0;
-            particles.forEach((p1, i) => {
-                particles.slice(i + 1).forEach((p2) => {
-                    const dx = p1.x - p2.x;
-                    const dy = p1.y - p2.y;
-                    const distance = Math.sqrt(dx * dx + dy * dy);
+            if (Array.isArray(particles)) {
+                particles.forEach((p1, i) => {
+                    particles.slice(i + 1).forEach((p2) => {
+                        const dx = p1.x - p2.x;
+                        const dy = p1.y - p2.y;
+                        const distance = Math.sqrt(dx * dx + dy * dy);
 
-                    if (distance < 120) {
-                        ctx.beginPath();
-                        ctx.moveTo(p1.x, p1.y);
-                        ctx.lineTo(p2.x, p2.y);
-                        ctx.strokeStyle = `rgba(100, 200, 255, ${0.1 * (1 - distance / 120)})`;
-                        ctx.lineWidth = 0.5;
-                        ctx.stroke();
-                    }
+                        if (distance < 120) {
+                            ctx.beginPath();
+                            ctx.moveTo(p1.x, p1.y);
+                            ctx.lineTo(p2.x, p2.y);
+                            ctx.strokeStyle = `rgba(100, 200, 255, ${0.1 * (1 - distance / 120)})`;
+                            ctx.lineWidth = 0.5;
+                            ctx.stroke();
+                        }
+                    });
                 });
-            });
+            }
 
             animationId = requestAnimationFrame(animate);
         };

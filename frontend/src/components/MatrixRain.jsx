@@ -6,25 +6,28 @@ const MatrixRain = () => {
     useEffect(() => {
         const canvas = canvasRef.current;
         const ctx = canvas.getContext('2d');
+        const fontSize = 14;
+        const chars = "0123456789ABCDEF";
+
+        let columns = canvas.width / fontSize;
+        let drops = [];
+
+        const initDrops = () => {
+            columns = canvas.width / fontSize;
+            drops = [];
+            for (let i = 0; i < columns; i++) {
+                drops[i] = 1;
+            }
+        };
 
         // Set canvas size
         const resizeCanvas = () => {
             canvas.width = window.innerWidth;
             canvas.height = window.innerHeight;
+            initDrops();
         };
         resizeCanvas();
         window.addEventListener('resize', resizeCanvas);
-
-        // Matrix characters
-        const chars = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ@#$%^&*';
-        const fontSize = 14;
-        const columns = canvas.width / fontSize;
-
-        // Array of drops - one per column
-        const drops = [];
-        for (let i = 0; i < columns; i++) {
-            drops[i] = 1;
-        }
 
         const draw = () => {
             // Black BG for the trail effect

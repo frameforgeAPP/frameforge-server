@@ -37,49 +37,7 @@ export default function GameSummary({ data, onClose }) {
         return `${hours > 0 ? hours + 'h ' : ''}${minutes}m ${seconds}s`;
     };
 
-    const handleShare = async () => {
-        setIsPaused(true); // Pause timer while sharing
-        if (!cardRef.current) return;
 
-        try {
-            const canvas = await html2canvas(cardRef.current, {
-                backgroundColor: '#000000',
-                scale: 1.5 // Balanced quality/size
-            });
-
-            const image = canvas.toDataURL("image/png");
-
-            // Check if running on Capacitor (Mobile)
-            // Simple check: if Share plugin is available (it usually is in web too but behaves differently)
-            // We'll try the Web Share API first which Capacitor hooks into, or fallback to download
-
-            if (navigator.share) {
-                // Convert dataURL to Blob for sharing
-                const res = await fetch(image);
-                const blob = await res.blob();
-                const file = new File([blob], "session-stats.png", { type: "image/png" });
-
-                if (navigator.canShare && navigator.canShare({ files: [file] })) {
-                    await navigator.share({
-                        files: [file],
-                        title: t('share_title'),
-                        text: t('share_text', { game: gameName, fps: Math.round(avgFps) }),
-                    });
-                } else {
-                    // Fallback for PC/Browsers that don't support file sharing
-                    downloadImage(image);
-                }
-            } else {
-                downloadImage(image);
-            }
-
-        } catch (err) {
-            console.error("Share failed:", err);
-            alert("Failed to share image.");
-        } finally {
-            setIsPaused(false);
-        }
-    };
 
     const downloadImage = (dataUrl) => {
         const link = document.createElement('a');
@@ -94,6 +52,7 @@ export default function GameSummary({ data, onClose }) {
                 {/* Close Button */}
                 <button
                     onClick={onClose}
+                    data-html2canvas-ignore="true"
                     className="absolute top-4 right-4 p-2 text-gray-500 hover:text-white transition-colors z-50"
                 >
                     <X size={32} />
@@ -153,25 +112,16 @@ export default function GameSummary({ data, onClose }) {
 
                 </div>
 
-                {/* Footer / Share */}
-                <div className="flex justify-center mb-4">
-                    <button
-                        onClick={handleShare}
-                        className="flex items-center gap-2 px-8 py-3 bg-blue-600 hover:bg-blue-500 text-white rounded-full font-bold transition-all hover:scale-105 shadow-lg shadow-blue-900/20"
-                    >
-                        <Share2 size={20} />
-                        {t('share_session')}
-                    </button>
-                </div>
+
 
                 {/* Progress Bar */}
-                <div className="w-full bg-gray-800 h-1 rounded-full overflow-hidden">
+                <div className="w-full bg-gray-800 h-1 rounded-full overflow-hidden" data-html2canvas-ignore="true">
                     <div
                         className="h-full bg-white transition-all duration-1000 ease-linear"
                         style={{ width: `${(timeLeft / 10) * 100}%` }}
                     ></div>
                 </div>
-                <div className="text-center mt-2 text-xs text-gray-600 font-mono">
+                <div className="text-center mt-2 text-xs text-gray-600 font-mono" data-html2canvas-ignore="true">
                     {isPaused ? t('paused') : `${t('closing_in')} ${timeLeft}s`}
                 </div>
 

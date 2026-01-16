@@ -89,24 +89,7 @@ export const themes = {
             grid: "rgba(255, 255, 255, 0.05)"
         }
     },
-    neonOrange: {
-        name: "Neon Orange",
-        colors: {
-            bg: "bg-[#0a0a0a]",
-            text: "text-[#ff6600]",
-            border: "border-[#cc5500]",
-            panelBg: "bg-[#1a0d00]",
-            accent: "text-[#ff8c00]",
-            accentBg: "bg-[#ff8c00]",
-            secondary: "text-[#ffa500]",
-            secondaryBg: "bg-[#ffa500]",
-            highlight: "text-[#ffb347]",
-            highlightBg: "bg-[#ffb347]",
-            success: "text-[#00ff00]",
-            danger: "text-[#ff0000]",
-            grid: "rgba(255, 102, 0, 0.15)"
-        }
-    },
+
     matrix: {
         name: "The Matrix",
         colors: {

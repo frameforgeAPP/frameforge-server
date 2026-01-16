@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Cpu, CircuitBoard, HardDrive, MonitorPlay, Maximize, Minimize, Clock as ClockIcon, Circle, Smartphone, X, Heart, Palette, ChevronLeft, Sun, Moon, Bell, History, Home, AlertTriangle } from 'lucide-react';
+import { Cpu, CircuitBoard, HardDrive, MonitorPlay, Maximize, Minimize, Clock as ClockIcon, Circle, Smartphone, X, Heart, Palette, ChevronLeft, Sun, Moon, Bell, Home, AlertTriangle } from 'lucide-react';
 import { LineChart, Line, ResponsiveContainer, YAxis } from 'recharts';
 import { ScreenBrightness } from '@capacitor-community/screen-brightness';
 import { Capacitor } from '@capacitor/core';
@@ -15,12 +15,13 @@ import ParticlesBackground from './ParticlesBackground';
 import GradientBackground from './GradientBackground';
 import PulseBackground from './PulseBackground';
 import ColorPickerModal from './ColorPickerModal';
+import HardwareSettings from './HardwareSettings';
 import Clock from './Clock';
 import { themes } from '../utils/themes';
 import { t } from '../utils/i18n';
 import { getAlertsSettings, triggerVibration, triggerSound } from '../utils/alertsUtils';
 
-export default function Dashboard({ data, toggleFullScreen, isFullscreen, connected, serverAddress, setServerAddress, isDemo, exitDemo, onOpenAlerts, onOpenHistory, onReturnToConfig }) {
+export default function Dashboard({ data, toggleFullScreen, isFullscreen, connected, serverAddress, setServerAddress, isDemo, exitDemo, onOpenAlerts, onReturnToConfig }) {
     // Check Afterburner Status
     const [showAfterburnerAlert, setShowAfterburnerAlert] = useState(false);
 
@@ -35,7 +36,7 @@ export default function Dashboard({ data, toggleFullScreen, isFullscreen, connec
     const [viewMode, setViewMode] = useState(() => {
         return localStorage.getItem('dashboardViewMode') || 'default';
     });
-    const [history, setHistory] = useState([]);
+
     const [isRecording, setIsRecording] = useState(false);
     const [showConnectModal, setShowConnectModal] = useState(false);
     const [showDonationModal, setShowDonationModal] = useState(false);
@@ -62,6 +63,41 @@ export default function Dashboard({ data, toggleFullScreen, isFullscreen, connec
     const [colorPickerTarget, setColorPickerTarget] = useState(null);
     const [showClock, setShowClock] = useState(false);
     const [showControls, setShowControls] = useState(false);
+    const [showHardwareSettings, setShowHardwareSettings] = useState(false);
+    const [hardwareLabels, setHardwareLabels] = useState(() => {
+        try {
+            const saved = localStorage.getItem('dashboardHardwareLabels');
+            return saved ? JSON.parse(saved) : { cpu: 'CPU', gpu: 'GPU', ram: 'RAM' };
+        } catch (e) {
+            return { cpu: 'CPU', gpu: 'GPU', ram: 'RAM' };
+        }
+    });
+
+    const handleSaveHardwareLabels = (newLabels) => {
+        setHardwareLabels(newLabels);
+        localStorage.setItem('dashboardHardwareLabels', JSON.stringify(newLabels));
+    };
+
+    // Demo Mode Theme Cycling
+    useEffect(() => {
+        if (!isDemo) return;
+
+        const demoThemes = ['default', 'matrix', 'cyberpunk', 'synthwave', 'minecraft'];
+        let currentIndex = 0;
+
+        const interval = setInterval(() => {
+            currentIndex = (currentIndex + 1) % demoThemes.length;
+            setCurrentTheme(demoThemes[currentIndex]);
+            // Also toggle RGB border for effect
+            if (currentIndex === 1) { // Matrix
+                setGlobalSettings(prev => ({ ...prev, rgbBorder: true }));
+            } else {
+                setGlobalSettings(prev => ({ ...prev, rgbBorder: false }));
+            }
+        }, 5000);
+
+        return () => clearInterval(interval);
+    }, [isDemo]);
 
     // Background Effects State
     const [currentBackground, setCurrentBackground] = useState(() => {
@@ -146,17 +182,46 @@ export default function Dashboard({ data, toggleFullScreen, isFullscreen, connec
     const baseTheme = themes[currentTheme] || themes.default;
 
     // Apply Dark/Light Mode Overrides
+    // Apply Dark/Light Mode Overrides AND Global Settings
+    // Fix: Only apply global overrides if they are explicitly set and not empty/default
+    const hasGlobalBg = globalSettings?.bg && globalSettings.bg !== '#111827'; // Assuming default dark bg
+    const hasGlobalText = globalSettings?.text && globalSettings.text !== '#ffffff';
+    const hasGlobalAccent = globalSettings?.accent && globalSettings.accent !== '#3b82f6';
+
     const theme = {
         ...baseTheme,
         colors: {
             ...baseTheme.colors,
-            bg: isDarkMode ? baseTheme.colors.bg : "bg-gray-50",
+            bg: hasGlobalBg ? `bg-[${globalSettings.bg}]` : (isDarkMode ? baseTheme.colors.bg : "bg-gray-50"),
             panelBg: isDarkMode ? baseTheme.colors.panelBg : "bg-white",
-            text: isDarkMode ? baseTheme.colors.text : "text-gray-950",
+            text: hasGlobalText ? `text-[${globalSettings.text}]` : (isDarkMode ? baseTheme.colors.text : "text-gray-950"),
             border: isDarkMode ? baseTheme.colors.border : "border-gray-300",
-            grid: isDarkMode ? baseTheme.colors.grid : "rgba(0,0,0,0.15)"
+            grid: isDarkMode ? baseTheme.colors.grid : "rgba(0,0,0,0.15)",
+            // Apply Global Accent if set
+            accent: hasGlobalAccent ? `text-[${globalSettings.accent}]` : baseTheme.colors.accent,
+            accentBg: hasGlobalAccent ? `bg-[${globalSettings.accent}]` : baseTheme.colors.accentBg,
+            highlight: hasGlobalAccent ? `text-[${globalSettings.accent}]` : baseTheme.colors.highlight,
+            secondary: hasGlobalAccent ? `text-[${globalSettings.accent}]` : baseTheme.colors.secondary,
         }
     };
+
+    // History State for Graphs
+    const [history, setHistory] = useState([]);
+
+    useEffect(() => {
+        if (!data) return;
+        setHistory(prev => {
+            const newPoint = {
+                timestamp: Date.now(),
+                cpuTemp: data.cpu.temp,
+                gpuTemp: data.gpus[0]?.temperature || 0
+            };
+            const newHistory = [...prev, newPoint];
+            // Keep last 60 points (approx 1 minute if 1 update/sec)
+            if (newHistory.length > 60) return newHistory.slice(newHistory.length - 60);
+            return newHistory;
+        });
+    }, [data]);
 
     // Performance Analyzer State
     const [recordingSession, setRecordingSession] = useState([]);
@@ -178,17 +243,7 @@ export default function Dashboard({ data, toggleFullScreen, isFullscreen, connec
     useEffect(() => {
         if (!data) return;
 
-        setHistory(prev => {
-            const newPoint = {
-                timestamp: Date.now(),
-                cpuTemp: data.cpu.temp,
-                gpuTemp: data.gpus[0]?.temperature || 0,
-                gpuLoad: data.gpus[0]?.load || 0
-            };
-            const newHistory = [...prev, newPoint];
-            if (newHistory.length > 30) newHistory.shift(); // Keep last 30 points
-            return newHistory;
-        });
+
 
         // Recording Logic
         if (isRecording) {
@@ -222,15 +277,16 @@ export default function Dashboard({ data, toggleFullScreen, isFullscreen, connec
         let shouldAlert = false;
 
         // Check thresholds
-        if (cpuTemp > alertSettings.cpuTempLimit) {
+        // Check thresholds with individual toggles
+        if (alertSettings.cpuAlertEnabled !== false && cpuTemp > alertSettings.cpuTempLimit) {
             console.log('Alert: CPU temp exceeded', cpuTemp, '>', alertSettings.cpuTempLimit);
             shouldAlert = true;
         }
-        if (gpuTemp > alertSettings.gpuTempLimit) {
+        if (alertSettings.gpuAlertEnabled !== false && gpuTemp > alertSettings.gpuTempLimit) {
             console.log('Alert: GPU temp exceeded', gpuTemp, '>', alertSettings.gpuTempLimit);
             shouldAlert = true;
         }
-        if (fps > 0 && fps < alertSettings.fpsLowLimit) {
+        if (alertSettings.fpsAlertEnabled !== false && fps > 0 && fps < alertSettings.fpsLowLimit) {
             console.log('Alert: FPS too low', fps, '<', alertSettings.fpsLowLimit);
             shouldAlert = true;
         }
@@ -256,6 +312,7 @@ export default function Dashboard({ data, toggleFullScreen, isFullscreen, connec
             setLastGameName(data.game);
             setRecordingSession([]);
             setIsRecording(true);
+            setShowClock(false); // Auto-switch to monitor view
         }
         // Stop Recording if game is no longer detected and currently recording
         else if (!data.game && isRecording) {
@@ -560,8 +617,8 @@ export default function Dashboard({ data, toggleFullScreen, isFullscreen, connec
                     <Palette size={18} className="group-hover:scale-110 transition-transform" />
                 </button>
 
-                {/* Dark/Light Mode Toggle */}
-                <button
+                {/* Dark/Light Mode Toggle - MOVED TO THEME SELECTOR */
+                /* <button
                     onClick={() => {
                         const newMode = !isDarkMode;
                         setIsDarkMode(newMode);
@@ -575,7 +632,7 @@ export default function Dashboard({ data, toggleFullScreen, isFullscreen, connec
                     ) : (
                         <Moon size={18} className="group-hover:scale-110 transition-transform" />
                     )}
-                </button>
+                </button> */}
 
                 {/* Alerts Button */}
                 {onOpenAlerts && (
@@ -588,16 +645,7 @@ export default function Dashboard({ data, toggleFullScreen, isFullscreen, connec
                     </button>
                 )}
 
-                {/* History Button */}
-                {onOpenHistory && (
-                    <button
-                        onClick={onOpenHistory}
-                        className="p-2 bg-gray-800/50 hover:bg-gray-700/80 rounded-full text-purple-400 hover:text-purple-500 transition-all backdrop-blur-sm border border-gray-700/50 group"
-                        title={t('session_history')}
-                    >
-                        <History size={18} className="group-hover:scale-110 transition-transform" />
-                    </button>
-                )}
+
             </div>
 
             {/* MOBILE MENU (Bottom Bar) - Hidden until tap */}
@@ -613,19 +661,13 @@ export default function Dashboard({ data, toggleFullScreen, isFullscreen, connec
                 <button onClick={() => setShowThemeSelector(true)} className="p-1.5 rounded-full text-blue-400">
                     <Palette size={18} />
                 </button>
-                <button onClick={() => setIsDarkMode(!isDarkMode)} className="p-1.5 rounded-full text-yellow-400">
-                    {isDarkMode ? <Sun size={18} /> : <Moon size={18} />}
-                </button>
+
                 {onOpenAlerts && (
                     <button onClick={onOpenAlerts} className="p-1.5 rounded-full text-orange-400">
                         <Bell size={18} />
                     </button>
                 )}
-                {onOpenHistory && (
-                    <button onClick={onOpenHistory} className="p-1.5 rounded-full text-purple-400">
-                        <History size={18} />
-                    </button>
-                )}
+
                 <button onClick={() => setShowDonationModal(true)} className="p-1.5 rounded-full text-red-400">
                     <Heart size={18} />
                 </button>
@@ -753,10 +795,15 @@ export default function Dashboard({ data, toggleFullScreen, isFullscreen, connec
                     <div className="flex flex-col md:flex-row items-center justify-between w-full h-full px-4 md:px-16 gap-8 md:gap-0 overflow-y-auto">
 
                         {/* LEFT: RAM */}
-                        <div className="flex flex-col items-center justify-center min-w-[150px]">
+                        <div
+                            className="flex flex-col items-center justify-center min-w-[150px] cursor-pointer hover:scale-105 transition-transform"
+                            onContextMenu={(e) => { e.preventDefault(); setShowHardwareSettings(true); }}
+                            onClick={() => setShowHardwareSettings(true)}
+                            title="Clique para renomear"
+                        >
                             <HardDrive className={`${theme.colors.secondary} mb-4`} size={48} />
                             <span className={`text-6xl font-bold ${theme.colors.text} tracking-tighter`}>{Math.floor(ram.used_gb)}</span>
-                            <span className="text-xl text-gray-500 tracking-widest mt-2">{t('gb_ram')}</span>
+                            <span className="text-xl text-gray-500 tracking-widest mt-2">{hardwareLabels.ram}</span>
                         </div>
 
                         {/* CENTER: Big Blue FPS & Game Name */}
@@ -782,10 +829,12 @@ export default function Dashboard({ data, toggleFullScreen, isFullscreen, connec
                         {/* RIGHT: CPU & GPU STACK */}
                         <div className="flex flex-col gap-8 justify-center min-w-[150px]">
                             {/* CPU */}
-                            <div className="flex flex-col items-center w-48">
+                            <div
+                                className="flex flex-col items-center w-48 transition-transform"
+                            >
                                 <div className="flex items-center gap-2 mb-1">
                                     <Cpu className={`${theme.colors.highlight} ${getPulseClass(cpu.load)}`} size={24} />
-                                    <span className="text-sm text-gray-500 tracking-widest">{t('cpu')}</span>
+                                    <span className="text-sm text-gray-500 tracking-widest">{hardwareLabels.cpu}</span>
                                 </div>
                                 <span className="text-5xl font-bold mb-2" style={{ color: getCpuColor(cpu.temp) }}>{Math.round(cpu.temp)}°</span>
                                 {/* Sparkline */}
@@ -803,7 +852,10 @@ export default function Dashboard({ data, toggleFullScreen, isFullscreen, connec
                             {gpus.length > 0 && (() => {
                                 const gpu = gpus[0];
                                 return (
-                                    <div key={gpu.id} className="flex flex-col items-center w-48">
+                                    <div
+                                        key={gpu.id}
+                                        className="flex flex-col items-center w-48 transition-transform"
+                                    >
                                         <div className="flex items-center gap-2 mb-1">
                                             <CircuitBoard className={`${theme.colors.highlight} ${getPulseClass(gpu.load)}`} size={24} />
                                             <span className="text-sm text-gray-500 tracking-widest">GPU</span>
@@ -842,14 +894,13 @@ export default function Dashboard({ data, toggleFullScreen, isFullscreen, connec
                             return (
                                 <div
                                     key={gpu.id}
-                                    onContextMenu={(e) => { e.preventDefault(); handleLongPress('gpu'); }}
-                                    className={`flex-1 rounded-xl border p-4 flex flex-col justify-center relative overflow-hidden group hover:border-orange-500/50 transition-all cursor-pointer ${globalSettings?.rgbBorder ? 'rgb-border-animated' : theme.colors.border}`}
+                                    className={`flex-1 rounded-xl border p-4 flex flex-col justify-center relative overflow-hidden group hover:border-orange-500/50 transition-all ${globalSettings?.rgbBorder ? 'rgb-border-animated' : theme.colors.border}`}
                                     style={{ backgroundColor: 'rgba(17, 24, 39, 0.4)' }}
                                 >
                                     <div className="flex justify-between items-center mb-2">
                                         <div className={`flex items-center gap-2 ${theme.colors.highlight}`} style={{ color: currentTheme === 'custom' ? customColors.gpu : undefined }}>
                                             <CircuitBoard size={20} className={getPulseClass(gpu.load)} />
-                                            <span className="font-bold tracking-wider">{t('gpu')}</span>
+                                            <span className="font-bold tracking-wider">{hardwareLabels.gpu}</span>
                                         </div>
                                         <div className="flex items-center gap-4">
                                             <div className="text-right">
@@ -877,14 +928,13 @@ export default function Dashboard({ data, toggleFullScreen, isFullscreen, connec
 
                         {/* RAM MODULE - MOVED DOWN */}
                         <div
-                            onContextMenu={(e) => { e.preventDefault(); handleLongPress('ram'); }}
-                            className={`flex-1 rounded-xl border p-4 flex flex-col justify-center relative overflow-hidden group hover:border-purple-500/50 transition-all cursor-pointer ${globalSettings?.rgbBorder ? 'rgb-border-animated' : theme.colors.border}`}
+                            className={`flex-1 rounded-xl border p-4 flex flex-col justify-center relative overflow-hidden group hover:border-purple-500/50 transition-all ${globalSettings?.rgbBorder ? 'rgb-border-animated' : theme.colors.border}`}
                             style={{ backgroundColor: 'rgba(17, 24, 39, 0.4)' }}
                         >
                             <div className="flex justify-between items-center mb-2">
                                 <div className={`flex items-center gap-2 ${theme.colors.secondary}`} style={{ color: currentTheme === 'custom' ? customColors.ram : undefined }}>
                                     <HardDrive size={20} />
-                                    <span className="font-bold tracking-wider">{t('ram')}</span>
+                                    <span className="font-bold tracking-wider">{hardwareLabels.ram}</span>
                                 </div>
                                 <div className="text-right">
                                     <span className={`text-2xl font-bold ${theme.colors.text}`}>{Math.round(ram.percent)}%</span>
@@ -904,14 +954,13 @@ export default function Dashboard({ data, toggleFullScreen, isFullscreen, connec
 
                         {/* CPU MODULE */}
                         <div
-                            onContextMenu={(e) => { e.preventDefault(); handleLongPress('cpu'); }}
-                            className={`flex-1 rounded-xl border p-4 flex flex-col justify-center relative overflow-hidden group hover:border-red-500/50 transition-all cursor-pointer ${globalSettings?.rgbBorder ? 'rgb-border-animated' : theme.colors.border}`}
+                            className={`flex-1 rounded-xl border p-4 flex flex-col justify-center relative overflow-hidden group hover:border-red-500/50 transition-all ${globalSettings?.rgbBorder ? 'rgb-border-animated' : theme.colors.border}`}
                             style={{ backgroundColor: 'rgba(17, 24, 39, 0.4)' }}
                         >
                             <div className="flex justify-between items-center mb-2">
                                 <div className={`flex items-center gap-2 ${theme.colors.highlight}`} style={{ color: currentTheme === 'custom' ? customColors.cpu : undefined }}>
                                     <Cpu size={20} className={getPulseClass(cpu.load)} />
-                                    <span className="font-bold tracking-wider">{t('cpu')}</span>
+                                    <span className="font-bold tracking-wider">{hardwareLabels.cpu}</span>
                                 </div>
                                 <div className="text-right">
                                     <span className="text-xs text-gray-500 block">{t('temp')}</span>
@@ -935,7 +984,16 @@ export default function Dashboard({ data, toggleFullScreen, isFullscreen, connec
             {/* MODALS */}
             {
                 showSummary && summaryData && (
-                    <GameSummary data={summaryData} onClose={() => setShowSummary(false)} />
+                    <GameSummary
+                        data={summaryData}
+                        onClose={() => {
+                            setShowSummary(false);
+                            // Default to true if undefined, but strictly respect false
+                            if (globalSettings?.clockAfterGame !== false) {
+                                setShowClock(true);
+                            }
+                        }}
+                    />
                 )
             }
 
@@ -956,6 +1014,28 @@ export default function Dashboard({ data, toggleFullScreen, isFullscreen, connec
                         onUploadBackground={handleUploadBackground}
                         globalSettings={globalSettings}
                         onUpdateGlobalSettings={handleUpdateGlobalSettings}
+                        isDarkMode={isDarkMode}
+                        onToggleDarkMode={() => {
+                            const newMode = !isDarkMode;
+                            setIsDarkMode(newMode);
+                            localStorage.setItem('dashboardDarkMode', JSON.stringify(newMode));
+                        }}
+                        onOpenClock={() => {
+                            setShowThemeSelector(false);
+                            setShowClock(true);
+                        }}
+                        customColors={customColors}
+                        onUpdateCustomColor={(target, color) => {
+                            const newColors = { ...customColors, [target]: color };
+                            setCustomColors(newColors);
+                            localStorage.setItem('dashboardCustomColors', JSON.stringify(newColors));
+                        }}
+                        hardwareLabels={hardwareLabels}
+                        onUpdateHardwareLabel={(key, value) => {
+                            const newLabels = { ...hardwareLabels, [key]: value };
+                            setHardwareLabels(newLabels);
+                            localStorage.setItem('hardwareLabels', JSON.stringify(newLabels));
+                        }}
                     />
                 )
             }
@@ -970,6 +1050,17 @@ export default function Dashboard({ data, toggleFullScreen, isFullscreen, connec
                     />
                 )
             }
+
+
+
+            {/* Hardware Settings Modal */}
+            {showHardwareSettings && (
+                <HardwareSettings
+                    initialLabels={hardwareLabels}
+                    onSave={handleSaveHardwareLabels}
+                    onClose={() => setShowHardwareSettings(false)}
+                />
+            )}
 
             {
                 showClock && (

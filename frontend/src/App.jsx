@@ -5,6 +5,7 @@ import { StatusBar } from '@capacitor/status-bar';
 import DashboardWithModals from './components/DashboardWithModals';
 import ConnectionScreen from './components/ConnectionScreen';
 import TutorialOverlay from './components/TutorialOverlay';
+import Clock from './components/Clock';
 import { generateMockData } from './utils/mockData';
 
 // Simple Error Boundary Component
@@ -16,7 +17,9 @@ function App() {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isDemo, setIsDemo] = useState(false);
   const [cameFromDashboard, setCameFromDashboard] = useState(false);
+
   const [showTutorial, setShowTutorial] = useState(false);
+  const [showClockOnDisconnect, setShowClockOnDisconnect] = useState(false);
   const [hasShownTutorial, setHasShownTutorial] = useState(() => {
     try {
       return localStorage.getItem('fps_monitor_tutorial_seen') === 'true';
@@ -103,7 +106,18 @@ function App() {
         console.log('Disconnected from backend:', reason);
         setConnected(false);
         setData(null);
-        // If disconnected unexpectedly, socket.io will auto-reconnect
+
+        // Check if we should show clock on disconnect
+        try {
+          const settings = JSON.parse(localStorage.getItem('dashboardGlobalSettings') || '{}');
+          // Default to true if not set
+          // Default to false (opt-in) to prevent unwanted opening
+          if (settings.clockAfterGame === true) {
+            setShowClockOnDisconnect(true);
+          }
+        } catch (e) {
+          console.error("Error reading settings", e);
+        }
       });
 
       socket.on('reconnect', (attemptNumber) => {
@@ -285,14 +299,27 @@ function App() {
       />
 
       {!connected ? (
-        <ConnectionScreen
-          onConnect={handleConnect}
-          onDemo={handleDemo}
-          serverAddress={serverAddress}
-          setServerAddress={setServerAddress}
-          cameFromDashboard={cameFromDashboard}
-          onReconnect={handleReconnect}
-        />
+        showClockOnDisconnect ? (
+          <div className="absolute inset-0 z-[100]">
+            <Clock
+              toggleFullScreen={toggleFullScreen}
+              serverAddress={serverAddress}
+              setServerAddress={setServerAddress}
+              onDismiss={() => setShowClockOnDisconnect(false)}
+              isDemo={isDemo}
+              onExitDemo={() => setShowClockOnDisconnect(false)}
+            />
+          </div>
+        ) : (
+          <ConnectionScreen
+            onConnect={handleConnect}
+            onDemo={handleDemo}
+            serverAddress={serverAddress}
+            setServerAddress={setServerAddress}
+            cameFromDashboard={cameFromDashboard}
+            onReconnect={handleReconnect}
+          />
+        )
       ) : (
         <DashboardWithModals
           data={data}
