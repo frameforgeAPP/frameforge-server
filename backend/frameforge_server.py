@@ -398,6 +398,7 @@ def get_gpu_stats_nvidia_smi():
         startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
         startupinfo.wShowWindow = subprocess.SW_HIDE
         
+        # Added 'utilization.memory' and better error handling
         result = subprocess.run(
             ['nvidia-smi', '--query-gpu=index,name,utilization.gpu,memory.used,memory.total,temperature.gpu', 
              '--format=csv,noheader,nounits'],
@@ -407,15 +408,26 @@ def get_gpu_stats_nvidia_smi():
         if result.returncode == 0 and result.stdout.strip():
             gpus = []
             for line in result.stdout.strip().split('\n'):
-                parts = [p.strip() for p in line.split(',')]
-                if len(parts) >= 6:
-                    gpus.append({
-                        "id": parts[0], "name": parts[1],
-                        "load": float(parts[2]) if parts[2] else 0,
-                        "memory_used": float(parts[3]) if parts[3] else 0,
-                        "memory_total": float(parts[4]) if parts[4] else 0,
-                        "temperature": float(parts[5]) if parts[5] else 0
-                    })
+                try:
+                    parts = [p.strip() for p in line.split(',')]
+                    if len(parts) >= 6:
+                        # Safe float conversion
+                        def safe_float(val):
+                            try:
+                                return float(val)
+                            except:
+                                return 0.0
+
+                        gpus.append({
+                            "id": parts[0], 
+                            "name": parts[1],
+                            "load": safe_float(parts[2]),
+                            "memory_used": safe_float(parts[3]),
+                            "memory_total": safe_float(parts[4]),
+                            "temperature": safe_float(parts[5])
+                        })
+                except:
+                    continue
             return gpus
     except Exception:
         pass

@@ -12,7 +12,7 @@ dependencies {
     implementation project(':capacitor-community-screen-brightness')
     implementation project(':capacitor-share')
     implementation project(':capacitor-status-bar')
-
+    implementation "com.android.billingclient:billing:7.1.1"
 }
 
 

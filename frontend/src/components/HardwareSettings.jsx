@@ -35,9 +35,9 @@ export default function HardwareSettings({ onClose, onSave, initialLabels }) {
                         </label>
                         <input
                             type="text"
-                            value={labels.cpu}
+                            value={labels.cpu || ''}
                             onChange={(e) => handleChange('cpu', e.target.value)}
-                            maxLength={15}
+                            maxLength={30}
                             className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-cyan-500"
                             placeholder="Ex: Ryzen 7 5700X"
                         />
@@ -50,9 +50,9 @@ export default function HardwareSettings({ onClose, onSave, initialLabels }) {
                         </label>
                         <input
                             type="text"
-                            value={labels.gpu}
+                            value={labels.gpu || ''}
                             onChange={(e) => handleChange('gpu', e.target.value)}
-                            maxLength={15}
+                            maxLength={30}
                             className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-cyan-500"
                             placeholder="Ex: RTX 4060"
                         />
@@ -65,9 +65,9 @@ export default function HardwareSettings({ onClose, onSave, initialLabels }) {
                         </label>
                         <input
                             type="text"
-                            value={labels.ram}
+                            value={labels.ram || ''}
                             onChange={(e) => handleChange('ram', e.target.value)}
-                            maxLength={10}
+                            maxLength={20}
                             className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-cyan-500"
                             placeholder="Ex: 32GB RAM"
                         />

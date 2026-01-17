@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Cpu, CircuitBoard, HardDrive, MonitorPlay, Maximize, Minimize, Clock as ClockIcon, Circle, Smartphone, X, Heart, Palette, ChevronLeft, Sun, Moon, Bell, Home, AlertTriangle } from 'lucide-react';
+import { Cpu, CircuitBoard, HardDrive, MonitorPlay, Maximize, Minimize, Clock as ClockIcon, Circle, Smartphone, X, Heart, Palette, ChevronLeft, Sun, Moon, Bell, Home, AlertTriangle, History } from 'lucide-react';
 import { LineChart, Line, ResponsiveContainer, YAxis } from 'recharts';
 import { ScreenBrightness } from '@capacitor-community/screen-brightness';
 import { Capacitor } from '@capacitor/core';
@@ -7,6 +7,9 @@ import QRCode from 'react-qr-code';
 import GameSummary from './GameSummary';
 import DonationModal from './DonationModal';
 import ThemeSelector from './ThemeSelector';
+import SessionHistory from './SessionHistory';
+import { saveSession } from '../utils/sessionStorage';
+import { t } from '../utils/i18n';
 import MatrixRain from './MatrixRain';
 import StarsBackground from './StarsBackground';
 import EmbersBackground from './EmbersBackground';
@@ -18,7 +21,6 @@ import ColorPickerModal from './ColorPickerModal';
 import HardwareSettings from './HardwareSettings';
 import Clock from './Clock';
 import { themes } from '../utils/themes';
-import { t } from '../utils/i18n';
 import { getAlertsSettings, triggerVibration, triggerSound } from '../utils/alertsUtils';
 
 export default function Dashboard({ data, toggleFullScreen, isFullscreen, connected, serverAddress, setServerAddress, isDemo, exitDemo, onOpenAlerts, onReturnToConfig }) {
@@ -40,6 +42,7 @@ export default function Dashboard({ data, toggleFullScreen, isFullscreen, connec
     const [isRecording, setIsRecording] = useState(false);
     const [showConnectModal, setShowConnectModal] = useState(false);
     const [showDonationModal, setShowDonationModal] = useState(false);
+    const [showHistory, setShowHistory] = useState(false);
     const [showThemeSelector, setShowThemeSelector] = useState(false);
     const [currentTheme, setCurrentTheme] = useState(() => {
         return localStorage.getItem('dashboardTheme') || 'default';
@@ -65,11 +68,12 @@ export default function Dashboard({ data, toggleFullScreen, isFullscreen, connec
     const [showControls, setShowControls] = useState(false);
     const [showHardwareSettings, setShowHardwareSettings] = useState(false);
     const [hardwareLabels, setHardwareLabels] = useState(() => {
+        const defaults = { cpu: 'CPU', gpu: 'GPU', ram: 'RAM' };
         try {
             const saved = localStorage.getItem('dashboardHardwareLabels');
-            return saved ? JSON.parse(saved) : { cpu: 'CPU', gpu: 'GPU', ram: 'RAM' };
+            return saved ? { ...defaults, ...JSON.parse(saved) } : defaults;
         } catch (e) {
-            return { cpu: 'CPU', gpu: 'GPU', ram: 'RAM' };
+            return defaults;
         }
     });
 
@@ -107,11 +111,12 @@ export default function Dashboard({ data, toggleFullScreen, isFullscreen, connec
         return localStorage.getItem('dashboardCustomBgImage') || null;
     });
     const [globalSettings, setGlobalSettings] = useState(() => {
+        const defaults = { accent: '#3b82f6', text: '#ffffff', bg: '#111827' };
         try {
             const saved = localStorage.getItem('dashboardGlobalSettings');
-            return saved ? JSON.parse(saved) : { accent: '#3b82f6', text: '#ffffff', bg: '#111827' };
+            return saved ? { ...defaults, ...JSON.parse(saved) } : defaults;
         } catch (e) {
-            return { accent: '#3b82f6', text: '#ffffff', bg: '#111827' };
+            return defaults;
         }
     });
 
@@ -339,13 +344,16 @@ export default function Dashboard({ data, toggleFullScreen, isFullscreen, connec
 
             const duration = recordingSession[count - 1].timestamp - recordingSession[0].timestamp;
 
-            setSummaryData({
+            const sessionData = {
                 gameName: lastGameName || t('manual_session'),
                 duration,
                 avgFps, minFps, maxFps,
                 avgCpuTemp, maxCpuTemp,
                 avgGpuTemp, maxGpuTemp
-            });
+            };
+
+            setSummaryData(sessionData);
+            saveSession(sessionData); // Auto-save to history
             setShowSummary(true);
             setLastGameName(""); // Reset
         } else if (!isRecording) {
@@ -608,6 +616,15 @@ export default function Dashboard({ data, toggleFullScreen, isFullscreen, connec
                     <Heart size={18} className="group-hover:scale-110 transition-transform" />
                 </button>
 
+                {/* History Button */}
+                <button
+                    onClick={() => setShowHistory(true)}
+                    className="p-2 bg-gray-800/50 hover:bg-gray-700/80 rounded-full text-purple-400 hover:text-purple-500 transition-all backdrop-blur-sm border border-gray-700/50 group"
+                    title={t('history')}
+                >
+                    <History size={18} className="group-hover:scale-110 transition-transform" />
+                </button>
+
                 {/* Theme Button */}
                 <button
                     onClick={() => setShowThemeSelector(true)}
@@ -657,6 +674,9 @@ export default function Dashboard({ data, toggleFullScreen, isFullscreen, connec
                 )}
                 <button onClick={() => setIsRecording(!isRecording)} className={`p-1.5 rounded-full ${isRecording ? 'text-red-500' : 'text-gray-400'}`}>
                     <Circle size={18} fill={isRecording ? "currentColor" : "none"} />
+                </button>
+                <button onClick={() => setShowHistory(true)} className="p-1.5 rounded-full text-purple-400">
+                    <History size={18} />
                 </button>
                 <button onClick={() => setShowThemeSelector(true)} className="p-1.5 rounded-full text-blue-400">
                     <Palette size={18} />
@@ -858,7 +878,7 @@ export default function Dashboard({ data, toggleFullScreen, isFullscreen, connec
                                     >
                                         <div className="flex items-center gap-2 mb-1">
                                             <CircuitBoard className={`${theme.colors.highlight} ${getPulseClass(gpu.load)}`} size={24} />
-                                            <span className="text-sm text-gray-500 tracking-widest">GPU</span>
+                                            <span className="text-sm text-gray-500 tracking-widest">{hardwareLabels.gpu}</span>
                                         </div>
                                         <div className="flex gap-4 items-baseline mb-2">
                                             <span className="text-5xl font-bold" style={{ color: getTempColor(gpu.temperature) }}>{Math.round(gpu.temperature)}°</span>
@@ -1034,7 +1054,7 @@ export default function Dashboard({ data, toggleFullScreen, isFullscreen, connec
                         onUpdateHardwareLabel={(key, value) => {
                             const newLabels = { ...hardwareLabels, [key]: value };
                             setHardwareLabels(newLabels);
-                            localStorage.setItem('hardwareLabels', JSON.stringify(newLabels));
+                            localStorage.setItem('dashboardHardwareLabels', JSON.stringify(newLabels));
                         }}
                     />
                 )
@@ -1052,6 +1072,24 @@ export default function Dashboard({ data, toggleFullScreen, isFullscreen, connec
             }
 
 
+
+            {
+                showHistory && (
+                    <SessionHistory
+                        isOpen={showHistory}
+                        onClose={() => setShowHistory(false)}
+                        onSelectSession={(session) => {
+                            setSummaryData(session);
+                            setShowSummary(true);
+                            setShowHistory(false);
+                        }}
+                        onCompare={(s1, s2) => {
+                            // TODO: Implement comparison view
+                            console.log("Compare", s1, s2);
+                        }}
+                    />
+                )
+            }
 
             {/* Hardware Settings Modal */}
             {showHardwareSettings && (

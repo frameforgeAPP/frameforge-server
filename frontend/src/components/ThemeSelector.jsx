@@ -1,12 +1,12 @@
 import React, { useRef, useState, useEffect } from 'react';
 import { Palette, X, Check, Image, Sparkles, Code, Flame, Upload, Sun, Moon, Zap, Droplets, Circle, Waves, Activity, Gamepad2, Lock, Unlock, Coffee, Clock } from 'lucide-react';
 import { themes } from '../utils/themes';
+import { PremiumManager } from '../utils/PremiumManager';
 import { t } from '../utils/i18n';
 
 // Define Premium Themes
 const PREMIUM_THEMES = ['matrix', 'roblox', 'minecraft'];
 const PREMIUM_BACKGROUNDS = ['matrix', 'embers', 'rain']; // Free: none, stars, particles
-const PRO_CODE = "FF-PRO-2026"; // Simple hardcoded code for v1.0
 
 export default function ThemeSelector({ currentTheme, onSelectTheme, onClose, currentBackground, onSelectBackground, onUploadBackground, globalSettings, onUpdateGlobalSettings, isDarkMode, onToggleDarkMode, onOpenClock, customColors, onUpdateCustomColor, hardwareLabels, onUpdateHardwareLabel }) {
     const fileInputRef = useRef(null);
@@ -14,6 +14,7 @@ export default function ThemeSelector({ currentTheme, onSelectTheme, onClose, cu
     const [showUnlockModal, setShowUnlockModal] = useState(false);
     const [unlockCode, setUnlockCode] = useState("");
     const [unlockError, setUnlockError] = useState("");
+    const [deviceId, setDeviceId] = useState("");
 
     useEffect(() => {
         // Check if user is already PRO
@@ -21,17 +22,20 @@ export default function ThemeSelector({ currentTheme, onSelectTheme, onClose, cu
         if (proStatus === 'true') {
             setIsPro(true);
         }
+        // Get Device ID
+        setDeviceId(PremiumManager.getDeviceId());
     }, []);
 
-    const handleUnlock = () => {
-        if (unlockCode.trim() === PRO_CODE) {
+    const handleUnlock = async () => {
+        const isValid = await PremiumManager.validateKey(unlockCode);
+        if (isValid) {
             localStorage.setItem('frameforge_is_pro', 'true');
             setIsPro(true);
             setShowUnlockModal(false);
             setUnlockCode("");
             alert("Funcionalidades Premium desbloqueadas com sucesso!");
         } else {
-            setUnlockError("Código inválido. Tente novamente.");
+            setUnlockError("Código inválido. Verifique se digitou corretamente.");
         }
     };
 
@@ -304,7 +308,8 @@ export default function ThemeSelector({ currentTheme, onSelectTheme, onClose, cu
                         <label className="text-xs text-gray-500">CPU</label>
                         <input
                             type="text"
-                            value={hardwareLabels?.cpu || 'CPU'}
+                            value={hardwareLabels?.cpu !== undefined ? hardwareLabels.cpu : ''}
+                            placeholder="CPU"
                             onChange={(e) => onUpdateHardwareLabel && onUpdateHardwareLabel('cpu', e.target.value)}
                             className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-yellow-500"
                         />
@@ -313,7 +318,8 @@ export default function ThemeSelector({ currentTheme, onSelectTheme, onClose, cu
                         <label className="text-xs text-gray-500">GPU</label>
                         <input
                             type="text"
-                            value={hardwareLabels?.gpu || 'GPU'}
+                            value={hardwareLabels?.gpu !== undefined ? hardwareLabels.gpu : ''}
+                            placeholder="GPU"
                             onChange={(e) => onUpdateHardwareLabel && onUpdateHardwareLabel('gpu', e.target.value)}
                             className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-yellow-500"
                         />
@@ -322,7 +328,8 @@ export default function ThemeSelector({ currentTheme, onSelectTheme, onClose, cu
                         <label className="text-xs text-gray-500">RAM</label>
                         <input
                             type="text"
-                            value={hardwareLabels?.ram || 'RAM'}
+                            value={hardwareLabels?.ram !== undefined ? hardwareLabels.ram : ''}
+                            placeholder="RAM"
                             onChange={(e) => onUpdateHardwareLabel && onUpdateHardwareLabel('ram', e.target.value)}
                             className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-yellow-500"
                         />
@@ -426,6 +433,43 @@ export default function ThemeSelector({ currentTheme, onSelectTheme, onClose, cu
                                 <div className="text-xs text-green-400 mt-1">Vitalício</div>
                             </div>
 
+                            {/* Device ID Display */}
+                            <div className="bg-black/40 rounded-lg p-3 mb-4 border border-gray-700/50 text-left">
+                                <div className="text-[10px] text-gray-500 uppercase tracking-wider mb-1">Seu ID de Dispositivo</div>
+                                <div className="flex items-center justify-between gap-2">
+                                    <code className="text-xs text-cyan-400 font-mono bg-cyan-900/20 px-2 py-1 rounded select-all">
+                                        {deviceId}
+                                    </code>
+                                    <button
+                                        onClick={() => {
+                                            navigator.clipboard.writeText(deviceId);
+                                            alert("ID copiado!");
+                                        }}
+                                        className="text-gray-400 hover:text-white"
+                                        title="Copiar ID"
+                                    >
+                                        <Code size={14} />
+                                    </button>
+                                </div>
+                                <p className="text-[9px] text-gray-600 mt-1">
+                                    Envie este ID junto com o comprovante de pagamento.
+                                </p>
+                            </div>
+
+                            <a
+                                href="#"
+                                onClick={(e) => {
+                                    e.preventDefault();
+                                    import('../utils/BillingService').then(({ BillingService }) => {
+                                        BillingService.purchase();
+                                    });
+                                }}
+                                className="flex items-center justify-center gap-2 w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-6 rounded-xl transition-all mb-2"
+                            >
+                                <Zap size={20} />
+                                Comprar com Google Play
+                            </a>
+
                             <a
                                 href="https://ko-fi.com/frameforge"
                                 target="_blank"
@@ -433,7 +477,7 @@ export default function ThemeSelector({ currentTheme, onSelectTheme, onClose, cu
                                 className="flex items-center justify-center gap-2 w-full bg-[#FF5E5B] hover:bg-[#D94140] text-white font-bold py-3 px-6 rounded-xl transition-all mb-4"
                             >
                                 <Coffee size={20} />
-                                Comprar Licença Agora
+                                Doar via Ko-fi (Alternativo)
                             </a>
 
                             <div className="relative mb-2">
