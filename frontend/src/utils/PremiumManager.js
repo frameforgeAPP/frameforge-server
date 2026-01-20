@@ -1,5 +1,7 @@
 
 import { LicenseService } from './LicenseService';
+import { ConfigService } from './ConfigService';
+import { Device } from '@capacitor/device';
 
 // Simple UUID generator
 function generateUUID() {
@@ -21,6 +23,48 @@ export const PremiumManager = {
         return deviceId;
     },
 
+    // Initialize persistent ID from hardware
+    initialize: async () => {
+        try {
+            const info = await Device.getId();
+            if (info && info.uuid) {
+                console.log("Hardware ID found:", info.uuid);
+                // Always overwrite local ID with hardware ID to ensure persistence
+                localStorage.setItem('frameforge_device_id', info.uuid);
+            }
+        } catch (e) {
+            console.warn("Could not get hardware ID, using fallback:", e);
+        }
+    },
+
+    // Sync remote config to check if app is free for everyone
+    syncRemoteConfig: async () => {
+        try {
+            const isFree = await ConfigService.isFreeForEveryone();
+            if (isFree) {
+                localStorage.setItem('frameforge_is_free_remote', 'true');
+                return true;
+            } else {
+                localStorage.removeItem('frameforge_is_free_remote');
+                return false;
+            }
+        } catch (e) {
+            console.error("Sync error:", e);
+            return false;
+        }
+    },
+
+    // Centralized check for PRO status
+    isPro: () => {
+        // 1. Check Remote Override (Free for Everyone)
+        if (localStorage.getItem('frameforge_is_free_remote') === 'true') return true;
+
+        // 2. Check Local Purchase/Unlock
+        if (localStorage.getItem('frameforge_is_pro') === 'true') return true;
+
+        return false;
+    },
+
     // Async validation using Web Crypto API OR License Service
     validateKey: async (inputKey) => {
         // 1. Check local legacy code
@@ -29,11 +73,29 @@ export const PremiumManager = {
             if (isValidLocal) return true;
         }
 
-        // 2. Check Online License (Firebase / Google Play)
-        const hasOnlineLicense = await LicenseService.checkLicense();
-        if (hasOnlineLicense) return true;
-
         return false;
+    },
+
+    // Unified redemption method (Local Hash OR Online Promo Code)
+    redeemKey: async (inputKey) => {
+        // 1. Try Local Validation (Device Hash)
+        if (await PremiumManager.validateLocalKey(inputKey)) {
+            localStorage.setItem('frameforge_is_pro', 'true');
+            return { success: true, type: 'local' };
+        }
+
+        // 2. Try Online Promo Code Redemption
+        try {
+            const result = await LicenseService.redeemCode(inputKey);
+            if (result.success) {
+                localStorage.setItem('frameforge_is_pro', 'true');
+                return { success: true, type: 'online' };
+            }
+        } catch (e) {
+            console.warn("Online redemption failed:", e);
+        }
+
+        return { success: false };
     },
 
     validateLocalKey: async (inputKey) => {
@@ -57,6 +119,10 @@ export const PremiumManager = {
 
     // Restore purchases (check online)
     restorePurchases: async () => {
+        // First check if it's free globally
+        await PremiumManager.syncRemoteConfig();
+        if (PremiumManager.isPro()) return true;
+
         const hasLicense = await LicenseService.checkLicense();
         if (hasLicense) {
             localStorage.setItem('frameforge_is_pro', 'true');

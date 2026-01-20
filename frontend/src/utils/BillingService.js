@@ -1,7 +1,9 @@
 import { LicenseService } from './LicenseService';
 
 // Product ID from Google Play Console
+// Product ID from Google Play Console
 const PRODUCT_ID_PRO = 'frameforge_pro_lifetime';
+const PRODUCT_ID_DONATION = 'frameforge_donation_small';
 
 export const BillingService = {
     store: null,
@@ -19,6 +21,10 @@ export const BillingService = {
         store.register([{
             type: window.CdvPurchase.ProductType.NON_CONSUMABLE,
             id: PRODUCT_ID_PRO,
+            platform: window.CdvPurchase.Platform.GOOGLE_PLAY,
+        }, {
+            type: window.CdvPurchase.ProductType.CONSUMABLE,
+            id: PRODUCT_ID_DONATION,
             platform: window.CdvPurchase.Platform.GOOGLE_PLAY,
         }]);
 
@@ -38,7 +44,23 @@ export const BillingService = {
                         alert("Compra realizada com sucesso! Funcionalidades PRO liberadas.");
                         // Reload or trigger state update
                         window.location.reload();
+                        window.location.reload();
                     });
+            })
+            .approved(transaction => {
+                // Handle Donation
+                if (transaction.products.find(p => p.id === PRODUCT_ID_DONATION)) {
+                    console.log('Donation approved:', transaction);
+                    transaction.verify();
+                }
+            })
+            .verified(receipt => {
+                // Handle Donation Verification
+                if (receipt.id === PRODUCT_ID_DONATION) {
+                    console.log('Donation verified:', receipt);
+                    receipt.finish();
+                    alert("Muito obrigado pelo seu apoio! ❤️");
+                }
             })
             .finished(transaction => {
                 console.log('Transaction finished:', transaction);
@@ -60,6 +82,19 @@ export const BillingService = {
             product.getOffer().order();
         } else {
             alert("Produto não disponível ou loja não inicializada.");
+        }
+    },
+
+    donate: () => {
+        if (!BillingService.store) {
+            BillingService.initialize();
+        }
+
+        const product = BillingService.store.get(PRODUCT_ID_DONATION);
+        if (product && product.canPurchase) {
+            product.getOffer().order();
+        } else {
+            alert("Doação não disponível no momento. Tente novamente mais tarde.");
         }
     },
 

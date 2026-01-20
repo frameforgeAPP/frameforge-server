@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FrameForge Device Key Generator</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { background-color: #0f172a; color: #e2e8f0; font-family: 'Segoe UI', sans-serif; }
+    </style>
+</head>
+<body class="min-h-screen flex items-center justify-center p-4">
+    <div class="bg-gray-800 rounded-2xl p-8 shadow-2xl max-w-md w-full border border-gray-700">
+        <h1 class="text-2xl font-bold text-white mb-6 text-center">Device Key Generator</h1>
+        
+        <div class="space-y-4">
+            <div>
+                <label class="block text-sm font-medium text-gray-400 mb-1">Device ID (from App)</label>
+                <input type="text" id="deviceId" placeholder="e.g. a1b2c3d4-..." 
+                    class="w-full bg-gray-900 border border-gray-600 rounded-lg px-4 py-3 text-white focus:ring-2 focus:ring-cyan-500 outline-none font-mono text-sm">
+            </div>
+
+            <button onclick="generateKey()" 
+                class="w-full bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white font-bold py-3 rounded-lg transition-all shadow-lg shadow-cyan-500/30">
+                Generate Unlock Code
+            </button>
+
+            <div id="resultContainer" class="hidden mt-6 p-4 bg-black/40 rounded-xl border border-gray-700 text-center">
+                <div class="text-xs text-gray-500 uppercase tracking-wider mb-2">Unlock Code</div>
+                <div id="resultCode" class="text-2xl font-mono font-bold text-yellow-400 select-all cursor-pointer" onclick="copyCode()"></div>
+                <div id="copyFeedback" class="text-xs text-green-500 mt-2 h-4"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const SECRET_SALT = "FRAMEFORGE_PREMIUM_2026_SALT_SECURE";
+
+        async function generateKey() {
+            const deviceId = document.getElementById('deviceId').value.trim();
+            if (!deviceId) {
+                alert("Please enter a Device ID");
+                return;
+            }
+
+            const data = new TextEncoder().encode(deviceId + SECRET_SALT);
+            const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+            const hashArray = Array.from(new Uint8Array(hashBuffer));
+            const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+            const key = hashHex.substring(0, 12).toUpperCase();
+
+            document.getElementById('resultCode').innerText = key;
+            document.getElementById('resultContainer').classList.remove('hidden');
+            document.getElementById('copyFeedback').innerText = "";
+        }
+
+        function copyCode() {
+            const code = document.getElementById('resultCode').innerText;
+            navigator.clipboard.writeText(code);
+            document.getElementById('copyFeedback').innerText = "Copied to clipboard!";
+        }
+    </script>
+</body>
+</html>

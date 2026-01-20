@@ -1,4 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
+import { analytics } from './utils/firebaseConfig';
+import { logEvent } from 'firebase/analytics';
 import { Maximize } from 'lucide-react';
 import io from 'socket.io-client';
 import { StatusBar } from '@capacitor/status-bar';
@@ -7,6 +9,7 @@ import ConnectionScreen from './components/ConnectionScreen';
 import TutorialOverlay from './components/TutorialOverlay';
 import Clock from './components/Clock';
 import { generateMockData } from './utils/mockData';
+import { PremiumManager } from './utils/PremiumManager';
 
 // Simple Error Boundary Component
 // ErrorBoundary moved to components/ErrorBoundary.jsx
@@ -63,6 +66,11 @@ function App() {
     return () => clearInterval(interval);
   }, [isDemo]);
 
+  // Initialize PremiumManager (Persistent Device ID)
+  useEffect(() => {
+    PremiumManager.initialize();
+  }, []);
+
   // Real Connection Logic
   useEffect(() => {
     if (isDemo) return; // Don't connect if in demo mode
@@ -93,6 +101,7 @@ function App() {
       socket.on('connect', () => {
         console.log('Connected to backend');
         setConnected(true);
+        logEvent(analytics, 'connect_server');
         // Request initial data immediately after connection
         socket.emit('request_data');
       });

@@ -2,7 +2,7 @@
 ; SEE THE DOCUMENTATION FOR DETAILS ON CREATING INNO SETUP SCRIPT FILES!
 
 #define MyAppName "FrameForge Server"
-#define MyAppVersion "1.0"
+#define MyAppVersion "1.4"
 #define MyAppPublisher "FrameForge"
 #define MyAppURL "https://github.com/frameforgeAPP/frameforge-server"
 #define MyAppExeName "FrameForgeServer.exe"
@@ -24,10 +24,11 @@ DisableProgramGroupPage=yes
 ;PrivilegesRequired=lowest
 OutputDir=Installers
 OutputBaseFilename=FrameForgeServer_Setup_v{#MyAppVersion}
-SetupIconFile=c:\PLAY STORE\icon.ico
+SetupIconFile=c:\PLAY STORE\backend\icon.ico
 Compression=lzma
 SolidCompression=yes
 WizardStyle=modern
+ShowLanguageDialog=yes
 UninstallDisplayIcon={app}\icon.ico
 
 [Languages]
@@ -38,8 +39,9 @@ Name: "brazilianportuguese"; MessagesFile: "compiler:Languages\BrazilianPortugue
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
 
 [Files]
-Source: "c:\PLAY STORE\dist\{#MyAppExeName}"; DestDir: "{app}"; Flags: ignoreversion
-Source: "c:\PLAY STORE\icon.ico"; DestDir: "{app}"; Flags: ignoreversion
+Source: "c:\PLAY STORE\amigo\FrameForge Server_v1.4_FixGPU.exe"; DestName: "{#MyAppExeName}"; DestDir: "{app}"; Flags: ignoreversion
+Source: "c:\PLAY STORE\backend\icon.ico"; DestDir: "{app}"; Flags: ignoreversion
+Source: "c:\PLAY STORE\frontend\dist\*"; DestDir: "{app}\frontend\dist"; Flags: ignoreversion recursesubdirs createallsubdirs
 ; NOTE: Don't use "Flags: ignoreversion" on any shared system files
 
 [Icons]

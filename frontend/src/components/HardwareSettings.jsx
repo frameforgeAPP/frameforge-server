@@ -1,4 +1,3 @@
-import React, { useState } from 'react';
 import { X, Save, Cpu, HardDrive, CircuitBoard } from 'lucide-react';
 import { t } from '../utils/i18n';
 

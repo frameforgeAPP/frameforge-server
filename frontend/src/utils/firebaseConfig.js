@@ -12,7 +12,15 @@ const firebaseConfig = {
     measurementId: "G-DY5KLHEGNH"
 };
 
+import { getAuth, signInAnonymously } from "firebase/auth";
+
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
 export const db = getFirestore(app);
 export const analytics = getAnalytics(app);
+export const auth = getAuth(app);
+
+// Auto-login anonymously
+signInAnonymously(auth).catch((error) => {
+    console.error("Anonymous Auth Failed:", error);
+});

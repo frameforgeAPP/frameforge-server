@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { Cpu, CircuitBoard, HardDrive, MonitorPlay, Maximize, Minimize, Clock as ClockIcon, Circle, Smartphone, X, Heart, Palette, ChevronLeft, Sun, Moon, Bell, Home, AlertTriangle, History } from 'lucide-react';
+import { Cpu, CircuitBoard, HardDrive, MonitorPlay, Maximize, Minimize, Clock as ClockIcon, Circle, Smartphone, X, Heart, Palette, ChevronLeft, Sun, Moon, Bell, Home, AlertTriangle, History, Lock as LockIcon } from 'lucide-react';
 import { LineChart, Line, ResponsiveContainer, YAxis } from 'recharts';
 import { ScreenBrightness } from '@capacitor-community/screen-brightness';
 import { Capacitor } from '@capacitor/core';
 import QRCode from 'react-qr-code';
 import GameSummary from './GameSummary';
 import DonationModal from './DonationModal';
+import UnlockModal from './UnlockModal';
 import ThemeSelector from './ThemeSelector';
 import SessionHistory from './SessionHistory';
 import { saveSession } from '../utils/sessionStorage';
@@ -22,12 +23,26 @@ import HardwareSettings from './HardwareSettings';
 import Clock from './Clock';
 import { themes } from '../utils/themes';
 import { getAlertsSettings, triggerVibration, triggerSound } from '../utils/alertsUtils';
+import { PremiumManager } from '../utils/PremiumManager';
+import { ConfigService } from '../utils/ConfigService';
 
 export default function Dashboard({ data, toggleFullScreen, isFullscreen, connected, serverAddress, setServerAddress, isDemo, exitDemo, onOpenAlerts, onReturnToConfig }) {
     // Check Afterburner Status
     const [showAfterburnerAlert, setShowAfterburnerAlert] = useState(false);
 
     useEffect(() => {
+        // Sync Remote Config (Check if Free for Everyone)
+        PremiumManager.syncRemoteConfig().then(isFree => {
+            if (isFree) {
+                console.log("App is in Free Mode (Remote Config)");
+            }
+        });
+
+        // Fetch Remote Premium Features
+        ConfigService.getPremiumConfiguration().then(config => {
+            setPremiumFeatures(config.premiumFeatures);
+        });
+
         if (data && (data.afterburner_status === 'not-found' || data.afterburner_status === 'installed')) {
             setShowAfterburnerAlert(true);
         } else {
@@ -42,6 +57,7 @@ export default function Dashboard({ data, toggleFullScreen, isFullscreen, connec
     const [isRecording, setIsRecording] = useState(false);
     const [showConnectModal, setShowConnectModal] = useState(false);
     const [showDonationModal, setShowDonationModal] = useState(false);
+    const [showUnlockModal, setShowUnlockModal] = useState(false);
     const [showHistory, setShowHistory] = useState(false);
     const [showThemeSelector, setShowThemeSelector] = useState(false);
     const [currentTheme, setCurrentTheme] = useState(() => {
@@ -52,6 +68,19 @@ export default function Dashboard({ data, toggleFullScreen, isFullscreen, connec
         return saved !== null ? JSON.parse(saved) : true;
     });
     const [localIp, setLocalIp] = useState("");
+    const [premiumFeatures, setPremiumFeatures] = useState(['alerts', 'history', 'rgbBorder']); // Default locked features
+    const [isPro, setIsPro] = useState(false);
+
+    useEffect(() => {
+        const checkPro = () => {
+            const status = PremiumManager.isPro();
+            setIsPro(status);
+        };
+        checkPro();
+        // Listen for storage changes in case pro status updates
+        window.addEventListener('storage', checkPro);
+        return () => window.removeEventListener('storage', checkPro);
+    }, []);
 
     // Custom Theme State
     const [customColors, setCustomColors] = useState(() => {
@@ -102,6 +131,34 @@ export default function Dashboard({ data, toggleFullScreen, isFullscreen, connec
 
         return () => clearInterval(interval);
     }, [isDemo]);
+
+    // Trial Logic
+    useEffect(() => {
+        const installDate = localStorage.getItem('installDate');
+        if (!installDate) {
+            localStorage.setItem('installDate', Date.now().toString());
+        }
+    }, []);
+
+    const checkHistoryAccess = async () => {
+        // 1. Check if PRO
+        const isPro = await BillingService.checkProStatus();
+        if (isPro) {
+            setShowHistory(true);
+            return;
+        }
+
+        // 2. Check Trial (14 days)
+        const installDate = parseInt(localStorage.getItem('installDate') || Date.now());
+        const daysSinceInstall = (Date.now() - installDate) / (1000 * 60 * 60 * 24);
+
+        if (daysSinceInstall <= 14) {
+            setShowHistory(true);
+        } else {
+            // Trial expired and not PRO
+            setShowDonationModal(true);
+        }
+    };
 
     // Background Effects State
     const [currentBackground, setCurrentBackground] = useState(() => {
@@ -618,11 +675,22 @@ export default function Dashboard({ data, toggleFullScreen, isFullscreen, connec
 
                 {/* History Button */}
                 <button
-                    onClick={() => setShowHistory(true)}
-                    className="p-2 bg-gray-800/50 hover:bg-gray-700/80 rounded-full text-purple-400 hover:text-purple-500 transition-all backdrop-blur-sm border border-gray-700/50 group"
+                    onClick={() => {
+                        if (premiumFeatures.includes('history') && !isPro) {
+                            setShowUnlockModal(true);
+                        } else {
+                            setShowHistory(true);
+                        }
+                    }}
+                    className={`p-2 bg-gray-800/50 hover:bg-gray-700/80 rounded-full text-purple-400 hover:text-purple-500 transition-all backdrop-blur-sm border border-gray-700/50 group relative ${premiumFeatures.includes('history') && !isPro ? 'opacity-75 grayscale-[0.5]' : ''}`}
                     title={t('history')}
                 >
                     <History size={18} className="group-hover:scale-110 transition-transform" />
+                    {premiumFeatures.includes('history') && !isPro && (
+                        <div className="absolute -top-1 -right-1 bg-yellow-500 rounded-full p-[2px]">
+                            <LockIcon size={8} className="text-black" />
+                        </div>
+                    )}
                 </button>
 
                 {/* Theme Button */}
@@ -654,11 +722,22 @@ export default function Dashboard({ data, toggleFullScreen, isFullscreen, connec
                 {/* Alerts Button */}
                 {onOpenAlerts && (
                     <button
-                        onClick={onOpenAlerts}
-                        className="p-2 bg-gray-800/50 hover:bg-gray-700/80 rounded-full text-orange-400 hover:text-orange-500 transition-all backdrop-blur-sm border border-gray-700/50 group"
+                        onClick={() => {
+                            if (premiumFeatures.includes('alerts') && !isPro) {
+                                setShowUnlockModal(true);
+                            } else {
+                                onOpenAlerts();
+                            }
+                        }}
+                        className={`p-2 bg-gray-800/50 hover:bg-gray-700/80 rounded-full text-orange-400 hover:text-orange-500 transition-all backdrop-blur-sm border border-gray-700/50 group relative ${premiumFeatures.includes('alerts') && !isPro ? 'opacity-75 grayscale-[0.5]' : ''}`}
                         title={t('alerts_settings')}
                     >
                         <Bell size={18} className="group-hover:scale-110 transition-transform" />
+                        {premiumFeatures.includes('alerts') && !isPro && (
+                            <div className="absolute -top-1 -right-1 bg-yellow-500 rounded-full p-[2px]">
+                                <LockIcon size={8} className="text-black" />
+                            </div>
+                        )}
                     </button>
                 )}
 
@@ -675,16 +754,38 @@ export default function Dashboard({ data, toggleFullScreen, isFullscreen, connec
                 <button onClick={() => setIsRecording(!isRecording)} className={`p-1.5 rounded-full ${isRecording ? 'text-red-500' : 'text-gray-400'}`}>
                     <Circle size={18} fill={isRecording ? "currentColor" : "none"} />
                 </button>
-                <button onClick={() => setShowHistory(true)} className="p-1.5 rounded-full text-purple-400">
+                <button onClick={() => {
+                    if (premiumFeatures.includes('history') && !isPro) {
+                        setShowDonationModal(true);
+                    } else {
+                        setShowHistory(true);
+                    }
+                }} className={`p-1.5 rounded-full text-purple-400 relative ${premiumFeatures.includes('history') && !isPro ? 'opacity-75 grayscale-[0.5]' : ''}`}>
                     <History size={18} />
+                    {premiumFeatures.includes('history') && !isPro && (
+                        <div className="absolute -top-1 -right-1 bg-yellow-500 rounded-full p-[2px]">
+                            <LockIcon size={8} className="text-black" />
+                        </div>
+                    )}
                 </button>
                 <button onClick={() => setShowThemeSelector(true)} className="p-1.5 rounded-full text-blue-400">
                     <Palette size={18} />
                 </button>
 
                 {onOpenAlerts && (
-                    <button onClick={onOpenAlerts} className="p-1.5 rounded-full text-orange-400">
+                    <button onClick={() => {
+                        if (premiumFeatures.includes('alerts') && !isPro) {
+                            setShowDonationModal(true);
+                        } else {
+                            onOpenAlerts();
+                        }
+                    }} className={`p-1.5 rounded-full text-orange-400 relative ${premiumFeatures.includes('alerts') && !isPro ? 'opacity-75 grayscale-[0.5]' : ''}`}>
                         <Bell size={18} />
+                        {premiumFeatures.includes('alerts') && !isPro && (
+                            <div className="absolute -top-1 -right-1 bg-yellow-500 rounded-full p-[2px]">
+                                <LockIcon size={8} className="text-black" />
+                            </div>
+                        )}
                     </button>
                 )}
 
@@ -1008,8 +1109,8 @@ export default function Dashboard({ data, toggleFullScreen, isFullscreen, connec
                         data={summaryData}
                         onClose={() => {
                             setShowSummary(false);
-                            // Default to true if undefined, but strictly respect false
-                            if (globalSettings?.clockAfterGame !== false) {
+                            // Strictly require true to open clock
+                            if (globalSettings?.clockAfterGame === true) {
                                 setShowClock(true);
                             }
                         }}

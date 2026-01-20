@@ -2,15 +2,14 @@ import React, { useState, useEffect } from 'react';
 import { X, Bell, BellOff, Thermometer, Cpu, CircuitBoard, Gauge, Volume2, VolumeX, Vibrate, RotateCcw, Lock, Unlock, Coffee } from 'lucide-react';
 import { getAlertsSettings, saveAlertsSettings, resetAlertsSettings, triggerVibration, triggerSound } from '../utils/alertsUtils';
 import { t } from '../utils/i18n';
-
-const PRO_CODE = "FF-PRO-2026";
+import { analytics } from '../utils/firebaseConfig';
+import { logEvent } from 'firebase/analytics';
+import UnlockModal from './UnlockModal';
 
 export default function AlertsSettings({ isOpen, onClose }) {
     const [settings, setSettings] = useState(getAlertsSettings());
     const [isPro, setIsPro] = useState(false);
     const [showUnlockModal, setShowUnlockModal] = useState(false);
-    const [unlockCode, setUnlockCode] = useState("");
-    const [unlockError, setUnlockError] = useState("");
 
     useEffect(() => {
         if (isOpen) {
@@ -27,6 +26,7 @@ export default function AlertsSettings({ isOpen, onClose }) {
         const newSettings = { ...settings, [key]: value };
         setSettings(newSettings);
         saveAlertsSettings(newSettings);
+        logEvent(analytics, 'update_alert_setting', { setting_name: key, value: value });
     };
 
     const handleReset = () => {
@@ -40,17 +40,6 @@ export default function AlertsSettings({ isOpen, onClose }) {
 
     const testSound = () => {
         triggerSound();
-    };
-
-    const handleUnlock = () => {
-        if (unlockCode.trim() === PRO_CODE) {
-            localStorage.setItem('frameforge_is_pro', 'true');
-            setIsPro(true);
-            setShowUnlockModal(false);
-            setUnlockCode("");
-        } else {
-            setUnlockError("Código inválido. Tente novamente.");
-        }
     };
 
     if (!isOpen) return null;
@@ -270,76 +259,10 @@ export default function AlertsSettings({ isOpen, onClose }) {
 
             {/* UNLOCK MODAL */}
             {showUnlockModal && (
-                <div className="fixed inset-0 z-[110] bg-black/95 backdrop-blur-xl flex items-center justify-center p-4">
-                    <div className="bg-gray-900 border border-yellow-500/30 rounded-2xl p-8 max-w-md w-full text-center relative shadow-2xl shadow-yellow-500/10">
-                        <button
-                            onClick={() => setShowUnlockModal(false)}
-                            className="absolute top-4 right-4 text-gray-500 hover:text-white transition-colors"
-                        >
-                            <X size={24} />
-                        </button>
-
-                        <div className="inline-flex items-center justify-center p-4 bg-yellow-500/10 rounded-full mb-6">
-                            <Lock className="text-yellow-500" size={48} />
-                        </div>
-
-                        <h2 className="text-2xl font-bold text-white mb-2">Desbloquear Versão PRO</h2>
-                        <p className="text-gray-400 mb-6">
-                            Tenha acesso vitalício a todos os temas Premium, Borda RGB, Alertas e muito mais!
-                        </p>
-
-                        <div className="bg-gray-800/50 rounded-xl p-4 mb-6 border border-gray-700">
-                            <div className="text-sm text-gray-400 mb-1">Acesso Total</div>
-                            <div className="text-3xl font-bold text-white">R$ 14,99</div>
-                            <div className="text-xs text-green-400 mt-1">Vitalício</div>
-                        </div>
-
-                        <a
-                            href="https://ko-fi.com/frameforge"
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="flex items-center justify-center gap-2 w-full bg-[#FF5E5B] hover:bg-[#D94140] text-white font-bold py-3 px-6 rounded-xl transition-all mb-4"
-                        >
-                            <Coffee size={20} />
-                            Comprar Licença Agora
-                        </a>
-
-                        <div className="relative mb-2">
-                            <div className="absolute inset-0 flex items-center">
-                                <div className="w-full border-t border-gray-700"></div>
-                            </div>
-                            <div className="relative flex justify-center text-sm">
-                                <span className="px-2 bg-gray-900 text-gray-500">Já tem um código?</span>
-                            </div>
-                        </div>
-
-                        <div className="flex gap-2">
-                            <input
-                                type="text"
-                                placeholder="Cole seu código aqui..."
-                                className="flex-1 bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-yellow-500"
-                                value={unlockCode}
-                                onChange={(e) => {
-                                    setUnlockCode(e.target.value);
-                                    setUnlockError("");
-                                }}
-                            />
-                            <button
-                                onClick={handleUnlock}
-                                className="bg-yellow-500 hover:bg-yellow-600 text-black font-bold px-4 py-2 rounded-lg transition-colors"
-                            >
-                                <Unlock size={18} />
-                            </button>
-                        </div>
-                        {unlockError && (
-                            <p className="text-red-500 text-xs mt-2 text-left">{unlockError}</p>
-                        )}
-
-                        <p className="text-[10px] text-gray-600 mt-6">
-                            Após o pagamento, enviaremos o código para seu e-mail.
-                        </p>
-                    </div>
-                </div>
+                <UnlockModal
+                    onClose={() => setShowUnlockModal(false)}
+                    onUnlock={() => setIsPro(true)}
+                />
             )}
         </div>
     );

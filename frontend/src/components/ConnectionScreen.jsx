@@ -63,7 +63,7 @@ export default function ConnectionScreen({ onConnect, onDemo, serverAddress, set
 
     const handleManualConnect = async () => {
         if (!manualIp.trim()) {
-            setConnectionError('Digite o IP do servidor');
+            setConnectionError(t('enter_server_ip'));
             return;
         }
 
@@ -92,7 +92,7 @@ export default function ConnectionScreen({ onConnect, onDemo, serverAddress, set
             if (response.ok) {
                 onConnect(address);
             } else {
-                setConnectionError('Servidor não respondeu corretamente');
+                setConnectionError(t('server_error_response'));
             }
         } catch (e) {
             // If fetch fails, still try to connect (socket.io may work)
@@ -126,13 +126,13 @@ export default function ConnectionScreen({ onConnect, onDemo, serverAddress, set
     };
 
     const handleShareEmail = (url, name) => {
-        const subject = encodeURIComponent(`${name} - Download`);
-        const body = encodeURIComponent(`Baixe o ${name} no seu PC:\n\n${url}`);
+        const subject = encodeURIComponent(t('share_server_subject'));
+        const body = encodeURIComponent(t('share_server_body', { url: url }));
         window.open(`mailto:?subject=${subject}&body=${body}`);
     };
 
     const handleShareWhatsApp = (url, name) => {
-        const text = encodeURIComponent(`🎮 ${name}\n\nBaixe no seu PC:\n${url}`);
+        const text = encodeURIComponent(t('share_whatsapp_text', { url: url }));
         window.open(`https://wa.me/?text=${text}`);
     };
 
@@ -140,9 +140,9 @@ export default function ConnectionScreen({ onConnect, onDemo, serverAddress, set
         try {
             await Share.share({
                 title: name,
-                text: `Baixe o ${name} no seu PC: ${url}`,
+                text: t('share_server_body', { url: url }),
                 url: url,
-                dialogTitle: 'Compartilhar link'
+                dialogTitle: t('share_dialog_title')
             });
         } catch (e) {
             console.error('Share failed', e);
@@ -187,7 +187,7 @@ export default function ConnectionScreen({ onConnect, onDemo, serverAddress, set
                             className="mt-3 inline-flex items-center gap-2 px-4 py-2 bg-cyan-600/20 hover:bg-cyan-600/40 border border-cyan-500/50 rounded-full text-cyan-400 text-xs font-medium transition-all"
                         >
                             <ArrowLeft size={14} />
-                            Voltar ao Monitoramento
+                            {t('back_to_monitoring')}
                         </button>
                     )}
                 </div>
@@ -197,12 +197,12 @@ export default function ConnectionScreen({ onConnect, onDemo, serverAddress, set
                     <div className="flex items-center justify-between mb-2">
                         <div className="flex items-center gap-2">
                             <div className="w-6 h-6 bg-gradient-to-br from-cyan-600 to-blue-600 rounded-full flex items-center justify-center text-xs font-bold">1</div>
-                            <h3 className="font-bold text-cyan-400 text-sm">MSI Afterburner (PC)</h3>
+                            <h3 className="font-bold text-cyan-400 text-sm">{t('msi_afterburner_pc')}</h3>
                         </div>
                         {/* Status LED */}
                         <div className={`w-3 h-3 rounded-full ${afterburnerStatus === 'running' ? 'bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]' : 'bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.6)]'}`} title={afterburnerStatus === 'running' ? 'Detectado' : 'Não detectado'} />
                     </div>
-                    <p className="text-gray-400 text-xs mb-3">Programa gratuito que captura FPS dos jogos</p>
+                    <p className="text-gray-400 text-xs mb-3">{t('download_install_and')} <strong className="text-cyan-400">{t('open')}</strong>{t('on_pc')}</p>
 
                     {/* URL Display */}
                     <div className="flex items-center gap-2 p-2 bg-black/50 rounded-lg border border-cyan-700/30 mb-2">
@@ -214,7 +214,7 @@ export default function ConnectionScreen({ onConnect, onDemo, serverAddress, set
                                 : 'bg-gray-700 hover:bg-gray-600 text-gray-300'
                                 }`}
                         >
-                            {copiedAfterburner ? '✓' : 'Copiar'}
+                            {copiedAfterburner ? '✓' : t('copy')}
                         </button>
                     </div>
 
@@ -222,15 +222,15 @@ export default function ConnectionScreen({ onConnect, onDemo, serverAddress, set
                     <div className="grid grid-cols-3 gap-2">
                         <button onClick={() => handleShareEmail(AFTERBURNER_URL, 'MSI Afterburner')} className="flex flex-col items-center gap-1 p-2 bg-gray-800/50 hover:bg-gray-700/50 rounded-lg transition-all border border-cyan-800/30">
                             <Mail size={14} className="text-cyan-400" />
-                            <span className="text-[10px] text-gray-400">Email</span>
+                            <span className="text-[10px] text-gray-400">{t('email')}</span>
                         </button>
                         <button onClick={() => handleShareWhatsApp(AFTERBURNER_URL, 'MSI Afterburner')} className="flex flex-col items-center gap-1 p-2 bg-gray-800/50 hover:bg-gray-700/50 rounded-lg transition-all border border-cyan-800/30">
                             <MessageCircle size={14} className="text-cyan-400" />
-                            <span className="text-[10px] text-gray-400">WhatsApp</span>
+                            <span className="text-[10px] text-gray-400">{t('whatsapp')}</span>
                         </button>
                         <button onClick={() => handleShareNative(AFTERBURNER_URL, 'MSI Afterburner')} className="flex flex-col items-center gap-1 p-2 bg-gray-800/50 hover:bg-gray-700/50 rounded-lg transition-all border border-cyan-800/30">
                             <Share2 size={14} className="text-cyan-400" />
-                            <span className="text-[10px] text-gray-400">Outros</span>
+                            <span className="text-[10px] text-gray-400">{t('others')}</span>
                         </button>
                     </div>
                 </div>
@@ -241,12 +241,12 @@ export default function ConnectionScreen({ onConnect, onDemo, serverAddress, set
                         <div className="flex items-center gap-2">
                             <div className="w-6 h-6 bg-gradient-to-br from-cyan-600 to-blue-600 rounded-full flex items-center justify-center text-xs font-bold">2</div>
                             <Monitor size={16} className="text-cyan-400" />
-                            <h3 className="font-bold text-cyan-400 text-sm">FrameForge Server (PC)</h3>
+                            <h3 className="font-bold text-cyan-400 text-sm">{t('frameforge_server_pc')}</h3>
                         </div>
                         {/* Status LED */}
                         <div className={`w-3 h-3 rounded-full ${serverOnline ? 'bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]' : 'bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.6)]'}`} title={serverOnline ? 'Online' : 'Offline'} />
                     </div>
-                    <p className="text-gray-400 text-xs mb-3">Nosso programa que envia dados para o celular</p>
+                    <p className="text-gray-400 text-xs mb-3">{t('download_install_and')} <strong className="text-cyan-400">{t('open')}</strong>{t('on_pc_to_connect')}</p>
 
                     {/* URL Display */}
                     <div className="flex items-center gap-2 p-2 bg-black/50 rounded-lg border border-cyan-700/30 mb-2">
@@ -258,7 +258,7 @@ export default function ConnectionScreen({ onConnect, onDemo, serverAddress, set
                                 : 'bg-gray-700 hover:bg-gray-600 text-gray-300'
                                 }`}
                         >
-                            {copiedServer ? '✓' : 'Copiar'}
+                            {copiedServer ? '✓' : t('copy')}
                         </button>
                     </div>
 
@@ -266,15 +266,15 @@ export default function ConnectionScreen({ onConnect, onDemo, serverAddress, set
                     <div className="grid grid-cols-3 gap-2">
                         <button onClick={() => handleShareEmail(SERVER_URL, 'FrameForge Server')} className="flex flex-col items-center gap-1 p-2 bg-gray-800/50 hover:bg-gray-700/50 rounded-lg transition-all border border-cyan-800/30">
                             <Mail size={14} className="text-cyan-400" />
-                            <span className="text-[10px] text-gray-400">Email</span>
+                            <span className="text-[10px] text-gray-400">{t('email')}</span>
                         </button>
                         <button onClick={() => handleShareWhatsApp(SERVER_URL, 'FrameForge Server')} className="flex flex-col items-center gap-1 p-2 bg-gray-800/50 hover:bg-gray-700/50 rounded-lg transition-all border border-cyan-800/30">
                             <MessageCircle size={14} className="text-cyan-400" />
-                            <span className="text-[10px] text-gray-400">WhatsApp</span>
+                            <span className="text-[10px] text-gray-400">{t('whatsapp')}</span>
                         </button>
                         <button onClick={() => handleShareNative(SERVER_URL, 'FrameForge Server')} className="flex flex-col items-center gap-1 p-2 bg-gray-800/50 hover:bg-gray-700/50 rounded-lg transition-all border border-cyan-800/30">
                             <Share2 size={14} className="text-cyan-400" />
-                            <span className="text-[10px] text-gray-400">Outros</span>
+                            <span className="text-[10px] text-gray-400">{t('others')}</span>
                         </button>
                     </div>
                 </div>
@@ -284,7 +284,7 @@ export default function ConnectionScreen({ onConnect, onDemo, serverAddress, set
                     <div className="flex items-start gap-2">
                         <Info size={14} className="text-blue-400 mt-0.5 flex-shrink-0" />
                         <p className="text-gray-400 text-xs leading-relaxed">
-                            <span className="text-blue-300 font-medium">Mesma rede Wi-Fi.</span> Conexão automática. Use QR/manual se houver erro.
+                            <span className="text-blue-300 font-medium">{t('same_wifi')}</span>{t('auto_connect_hint')}
                         </p>
                     </div>
                 </div>
@@ -302,7 +302,7 @@ export default function ConnectionScreen({ onConnect, onDemo, serverAddress, set
                             onClick={() => setShowScanner(false)}
                             className="text-cyan-400 hover:text-white text-sm"
                         >
-                            Cancelar
+                            {t('cancel')}
                         </button>
                     </div>
                 ) : (
@@ -339,7 +339,7 @@ export default function ConnectionScreen({ onConnect, onDemo, serverAddress, set
                                 {connectionError && (
                                     <p className="text-red-400 text-xs text-center mb-2">{connectionError}</p>
                                 )}
-                                <p className="text-gray-500 text-[10px] text-center mb-2">Porta :8000 será adicionada automaticamente</p>
+                                <p className="text-gray-500 text-[10px] text-center mb-2">{t('port_hint')}</p>
                                 <button
                                     onClick={handleManualConnect}
                                     disabled={isConnecting}
@@ -347,7 +347,7 @@ export default function ConnectionScreen({ onConnect, onDemo, serverAddress, set
                                         ? 'bg-gray-700/50 border-gray-600/50 text-gray-400 cursor-wait'
                                         : 'bg-cyan-700/50 hover:bg-cyan-600/50 border-cyan-600/50 text-white'}`}
                                 >
-                                    {isConnecting ? '⏳ Conectando...' : t('connect')}
+                                    {isConnecting ? `⏳ ${t('connecting')}` : t('connect')}
                                 </button>
                             </div>
                         )}

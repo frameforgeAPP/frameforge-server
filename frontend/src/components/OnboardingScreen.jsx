@@ -2,6 +2,7 @@ import React from 'react';
 import { Download, CheckCircle, Play, Info, Copy, Mail, MessageCircle, Share2, Monitor, ExternalLink } from 'lucide-react';
 import { Share } from '@capacitor/share';
 import { markOnboardingSeen } from '../utils/afterburnerUtils';
+import { t } from '../utils/i18n';
 
 const SERVER_URL = 'https://github.com/frameforgeAPP/frameforge-server/releases';
 const AFTERBURNER_URL = 'https://www.msi.com/Landing/afterburner/graphics-cards';
@@ -28,13 +29,13 @@ export default function OnboardingScreen({ onComplete, onDemo }) {
     };
 
     const handleShareEmail = () => {
-        const subject = encodeURIComponent('FrameForge Server - Download');
-        const body = encodeURIComponent(`Baixe o FrameForge Server no seu PC:\n\n${SERVER_URL}\n\nEste programa é necessário para enviar os dados de FPS para o app no celular.`);
+        const subject = encodeURIComponent(t('share_server_subject'));
+        const body = encodeURIComponent(t('share_server_body', { url: SERVER_URL }));
         window.open(`mailto:?subject=${subject}&body=${body}`);
     };
 
     const handleShareWhatsApp = () => {
-        const text = encodeURIComponent(`🎮 FrameForge Server\n\nBaixe no seu PC para ver o FPS no celular:\n${SERVER_URL}`);
+        const text = encodeURIComponent(t('share_whatsapp_text', { url: SERVER_URL }));
         window.open(`https://wa.me/?text=${text}`);
     };
 
@@ -42,9 +43,9 @@ export default function OnboardingScreen({ onComplete, onDemo }) {
         try {
             await Share.share({
                 title: 'FrameForge Server',
-                text: `Baixe o FrameForge Server no seu PC: ${SERVER_URL}`,
+                text: t('share_server_body', { url: SERVER_URL }),
                 url: SERVER_URL,
-                dialogTitle: 'Compartilhar link do servidor'
+                dialogTitle: t('share_dialog_title')
             });
         } catch (e) {
             console.error('Share failed', e);
@@ -102,7 +103,7 @@ export default function OnboardingScreen({ onComplete, onDemo }) {
                             <div className="flex-1">
                                 <h3 className="font-bold mb-1 text-cyan-100">MSI Afterburner (PC)</h3>
                                 <p className="text-gray-400 text-sm mb-2">
-                                    Programa gratuito que captura FPS dos jogos
+                                    Baixe, instale e <strong className="text-cyan-400">abra</strong> no seu PC. (O RivaTuner abre junto)
                                 </p>
                                 <div className="flex items-center gap-2 text-cyan-400 text-xs">
                                     <CheckCircle className="w-3 h-3" />
@@ -119,7 +120,7 @@ export default function OnboardingScreen({ onComplete, onDemo }) {
                             <div className="flex-1">
                                 <h3 className="font-bold mb-1 text-cyan-100">FrameForge Server (PC)</h3>
                                 <p className="text-gray-400 text-sm">
-                                    Nosso programa que envia dados para o celular
+                                    Baixe, instale e <strong className="text-cyan-400">abra</strong> no seu PC para conectar.
                                 </p>
                             </div>
                         </div>

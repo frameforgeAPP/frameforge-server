@@ -1,10 +1,21 @@
 import React, { useState, useEffect } from 'react';
-import { Heart, Copy, ExternalLink, X, Check, Sparkles, Coffee, Zap, Gift, Star } from 'lucide-react';
+import { Heart, Copy, ExternalLink, X, Check, Sparkles, Coffee, Zap, Gift, Star, Smartphone, Key, Unlock, Code, Smile } from 'lucide-react';
+import { PremiumManager } from '../utils/PremiumManager';
 import QRCode from 'react-qr-code';
+import { Capacitor } from '@capacitor/core';
 import { t } from '../utils/i18n';
+import { BillingService } from '../utils/BillingService';
 
 export default function DonationModal({ onClose }) {
     const [copied, setCopied] = useState(false);
+    const isAndroid = Capacitor.getPlatform() === 'android';
+    const [unlockCode, setUnlockCode] = useState("");
+    const [unlockError, setUnlockError] = useState("");
+    const [deviceId, setDeviceId] = useState("");
+
+    useEffect(() => {
+        setDeviceId(PremiumManager.getDeviceId());
+    }, []);
 
     // Detect language for default tab and order
     const isPt = navigator.language?.startsWith('pt');
@@ -19,6 +30,25 @@ export default function DonationModal({ onClose }) {
         navigator.clipboard.writeText(pixKey);
         setCopied(true);
         setTimeout(() => setCopied(false), 2000);
+    };
+
+    const handlePurchase = async () => {
+        try {
+            await BillingService.donate();
+        } catch (error) {
+            console.error("Donation failed", error);
+            alert(t('error_donation') + error.message);
+        }
+    };
+
+    const handleUnlock = async () => {
+        const result = await PremiumManager.redeemKey(unlockCode);
+        if (result.success) {
+            alert(t('premium_unlocked'));
+            onClose();
+        } else {
+            setUnlockError(t('code_invalid'));
+        }
     };
 
     // Define tabs content
@@ -89,6 +119,53 @@ export default function DonationModal({ onClose }) {
                     {t('international_payments')}
                 </p>
             </div>
+        ),
+        code: (
+            <div className="flex flex-col gap-4">
+                <div className="bg-black/40 rounded-lg p-3 border border-gray-700/50 text-left">
+                    <div className="text-[10px] text-gray-500 uppercase tracking-wider mb-1">{t('device_id')}</div>
+                    <div className="flex items-center justify-between gap-2">
+                        <code className="text-xs text-cyan-400 font-mono bg-cyan-900/20 px-2 py-1 rounded select-all">
+                            {deviceId}
+                        </code>
+                        <button
+                            onClick={() => {
+                                navigator.clipboard.writeText(deviceId);
+                                alert(t('id_copied'));
+                            }}
+                            className="text-gray-400 hover:text-white"
+                            title="Copiar ID"
+                        >
+                            <Copy size={14} />
+                        </button>
+                    </div>
+                    <p className="text-[9px] text-gray-600 mt-1">
+                        {t('send_id_proof')}
+                    </p>
+                </div>
+
+                <div className="flex gap-2">
+                    <input
+                        type="text"
+                        placeholder={t('paste_code')}
+                        className="flex-1 bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-yellow-500 uppercase text-sm"
+                        value={unlockCode}
+                        onChange={(e) => {
+                            setUnlockCode(e.target.value.toUpperCase());
+                            setUnlockError("");
+                        }}
+                    />
+                    <button
+                        onClick={handleUnlock}
+                        className="bg-yellow-500 hover:bg-yellow-600 text-black font-bold px-4 py-2 rounded-lg transition-colors"
+                    >
+                        <Unlock size={18} />
+                    </button>
+                </div>
+                {unlockError && (
+                    <p className="text-red-500 text-xs text-left">{unlockError}</p>
+                )}
+            </div>
         )
     };
 
@@ -130,16 +207,14 @@ export default function DonationModal({ onClose }) {
 
                 {/* Header */}
                 <div className="text-center pt-10 pb-6 px-8 relative">
-                    <div className="inline-flex items-center justify-center p-4 bg-gradient-to-br from-pink-500 to-purple-600 rounded-2xl mb-4 shadow-lg shadow-pink-500/30">
-                        <Heart className="text-white fill-white" size={28} />
+                    <div className="inline-flex items-center justify-center p-4 bg-amber-100 rounded-full mb-4 shadow-lg shadow-amber-500/20">
+                        <Coffee className="text-amber-600 fill-amber-600" size={32} />
                     </div>
                     <h2 className="text-2xl font-bold text-white mb-2 flex items-center justify-center gap-2">
-                        <Sparkles className="w-5 h-5 text-yellow-400" />
-                        {t('support_frameforge')}
-                        <Sparkles className="w-5 h-5 text-yellow-400" />
+                        {t('buy_coffee')}
                     </h2>
                     <p className="text-gray-400 text-sm leading-relaxed">
-                        {t('donation_description')}
+                        {t('buy_coffee_desc')}
                     </p>
                 </div>
 
@@ -159,30 +234,93 @@ export default function DonationModal({ onClose }) {
                     </div>
                 </div>
 
-                {/* Tab Selector */}
-                <div className="flex gap-2 mx-6 mb-4">
-                    {tabButtons.map(btn => (
+                {/* ANDROID: Google Play Billing + Code Option */}
+                {isAndroid ? (
+                    <div className="px-6 pb-8 flex flex-col gap-4">
+                        {/* Play Store Button */}
                         <button
-                            key={btn.id}
-                            onClick={() => setActiveTab(btn.id)}
-                            className={`flex-1 py-2 px-4 rounded-xl font-medium text-sm transition-all ${getTabColorClass(btn.color, activeTab === btn.id)}`}
+                            onClick={handlePurchase}
+                            className="w-full py-4 bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-400 hover:to-orange-500 text-white font-bold rounded-2xl transition-all hover:scale-[1.02] hover:shadow-lg hover:shadow-amber-500/30 flex items-center justify-center gap-3"
                         >
-                            {btn.label}
+                            <Coffee size={24} />
+                            <div className="flex flex-col items-start">
+                                <span className="text-sm font-medium opacity-90">{t('send_coffee')}</span>
+                                <span className="text-xs opacity-75">{t('via_google_play')}</span>
+                            </div>
                         </button>
-                    ))}
-                </div>
 
-                {/* Content Area */}
-                <div className="px-6 pb-6">
-                    {tabs[activeTab]}
-                </div>
+                        {/* Device ID Display (Always Visible) */}
+                        <div className="bg-black/20 rounded-lg p-2 border border-gray-700/30 flex items-center justify-between gap-2">
+                            <div className="flex flex-col overflow-hidden">
+                                <span className="text-[9px] text-gray-500 uppercase tracking-wider">{t('device_id')}</span>
+                                <code className="text-xs text-cyan-400 font-mono truncate select-all">{deviceId}</code>
+                            </div>
+                            <button
+                                onClick={() => {
+                                    navigator.clipboard.writeText(deviceId);
+                                    alert(t('id_copied'));
+                                }}
+                                className="p-2 text-gray-400 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
+                                title="Copiar ID"
+                            >
+                                <Copy size={14} />
+                            </button>
+                        </div>
+
+                        <div className="relative flex py-2 items-center">
+                            <div className="flex-grow border-t border-gray-700"></div>
+                            <span className="flex-shrink-0 mx-4 text-gray-500 text-xs uppercase">{t('or_use_code')}</span>
+                            <div className="flex-grow border-t border-gray-700"></div>
+                        </div>
+
+                        {/* Code Redemption Section (Inline for Android) */}
+                        <button
+                            onClick={() => setActiveTab(activeTab === 'code' ? '' : 'code')}
+                            className={`w-full py-3 bg-gray-800/50 hover:bg-gray-700/50 text-gray-300 font-medium rounded-xl transition-all border border-gray-700/50 flex items-center justify-center gap-2 ${activeTab === 'code' ? 'ring-2 ring-purple-500/50' : ''}`}
+                        >
+                            <Key size={18} />
+                            {activeTab === 'code' ? t('hide_code') : t('have_code')}
+                        </button>
+
+                        {activeTab === 'code' && (
+                            <div className="animate-in slide-in-from-top-2 duration-200">
+                                {tabs.code}
+                            </div>
+                        )}
+
+                        <p className="text-center text-xs text-gray-500 mt-2">
+                            Sua ajuda mantém o projeto vivo!
+                        </p>
+                    </div>
+                ) : (
+                    /* NON-ANDROID: External Donations (Pix, PayPal, Ko-fi) */
+                    <>
+                        {/* Tab Selector */}
+                        <div className="flex gap-2 mx-6 mb-4">
+                            {tabButtons.map(btn => (
+                                <button
+                                    key={btn.id}
+                                    onClick={() => setActiveTab(btn.id)}
+                                    className={`flex-1 py-2 px-4 rounded-xl font-medium text-sm transition-all ${getTabColorClass(btn.color, activeTab === btn.id)}`}
+                                >
+                                    {btn.label}
+                                </button>
+                            ))}
+                        </div>
+
+                        {/* Content Area */}
+                        <div className="px-6 pb-6">
+                            {tabs[activeTab]}
+                        </div>
+                    </>
+                )}
 
                 {/* Footer */}
                 <div className="text-center pb-6 px-6">
                     <div className="flex items-center justify-center gap-2 text-xs text-gray-500">
-                        <Heart className="w-3 h-3 text-pink-400 fill-pink-400" />
-                        <span>{t('thanks_support')}</span>
-                        <Heart className="w-3 h-3 text-pink-400 fill-pink-400" />
+                        <Smile className="w-3 h-3 text-amber-400" />
+                        <span>Obrigado por usar o FrameForge!</span>
+                        <Heart className="w-3 h-3 text-red-500 fill-red-500" />
                     </div>
                 </div>
             </div>

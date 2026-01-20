@@ -8,6 +8,51 @@ RTSS_SHARED_MEMORY_NAME = "RTSSSharedMemoryV2"
 # Constants
 RTSS_MAX_OSD_SLOTS = 8
 
+# Game Name Mapping (Executable -> Readable Name)
+GAME_NAME_MAPPING = {
+    "shproo": "Silent Hill 2",
+    "cs2": "Counter-Strike 2",
+    "dota2": "Dota 2",
+    "gta5": "Grand Theft Auto V",
+    "rdr2": "Red Dead Redemption 2",
+    "cyberpunk2077": "Cyberpunk 2077",
+    "witcher3": "The Witcher 3",
+    "valorant": "Valorant",
+    "league of legends": "League of Legends",
+    "fortniteclient-win64-shipping": "Fortnite",
+    "minecraft": "Minecraft",
+    "robloxplayerbeta": "Roblox",
+    "eurotrucks2": "Euro Truck Simulator 2",
+    "pubg": "PUBG: Battlegrounds",
+    "apex": "Apex Legends",
+    "cod": "Call of Duty",
+    "modernwarfare": "Call of Duty: MW",
+    "blackops6": "Call of Duty: BO6",
+    "eldenring": "Elden Ring",
+    "godofwar": "God of War",
+    "spiderman": "Spider-Man",
+    "forza": "Forza Horizon",
+    "forzahorizon5": "Forza Horizon 5",
+    "rocketleague": "Rocket League",
+    "overwatch": "Overwatch 2",
+    "re4": "Resident Evil 4",
+    "re2": "Resident Evil 2",
+    "re3": "Resident Evil 3",
+    "re7": "Resident Evil 7",
+    "re8": "Resident Evil Village",
+    "stardew valley": "Stardew Valley",
+    "terraria": "Terraria",
+    "among us": "Among Us",
+    "palworld": "Palworld",
+    "baldur": "Baldur's Gate 3",
+    "bg3": "Baldur's Gate 3",
+    "bg3_dx11": "Baldur's Gate 3",
+    "starfield": "Starfield",
+    "hogwartslegacy": "Hogwarts Legacy",
+    "ffxv": "Final Fantasy XV",
+    "ff7remake": "Final Fantasy VII Remake",
+}
+
 class RTSS_SHARED_MEMORY_OSD_ENTRY(ctypes.Structure):
     _fields_ = [
         ("szOSD", ctypes.c_char * 256),
@@ -120,6 +165,12 @@ class RTSSReader:
                                     name = name[:-4]
                                 # Clean up common suffixes
                                 name = name.replace("-Win64-Shipping", "").replace("-Shipping", "")
+                                
+                                # Check mapping (case-insensitive)
+                                lower_name = name.lower()
+                                if lower_name in GAME_NAME_MAPPING:
+                                    name = GAME_NAME_MAPPING[lower_name]
+                                    
                                 active_game = name
                             except:
                                 pass

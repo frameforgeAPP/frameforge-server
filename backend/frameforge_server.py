@@ -433,20 +433,75 @@ def get_gpu_stats_nvidia_smi():
         pass
     return []
 
+def prioritize_gpus(gpu_list):
+    if not gpu_list:
+        return []
+        
+    def is_dedicated(name):
+        n = name.lower()
+        return "nvidia" in n or "radeon" in n or "rtx" in n or "gtx" in n or "rx" in n or "arc" in n
+
+    # Sort by:
+    # 1. Dedicated (True > False)
+    # 2. Load (Higher > Lower)
+    # 3. Memory Used (Higher > Lower)
+    return sorted(gpu_list, key=lambda x: (
+        is_dedicated(x['name']),
+        x['load'],
+        x['memory_used']
+    ), reverse=True)
+
 def get_gpu_stats():
+    all_gpus = []
+    
+    # 1. Try MSI Afterburner (Best for gaming)
     try:
-        gpus = mahm_reader.read_gpu_stats()
-        if gpus:
-            return gpus
+        mahm_gpus = mahm_reader.read_gpu_stats()
+        if mahm_gpus:
+            all_gpus.extend(mahm_gpus)
     except:
         pass
+
+    # 2. Try LibreHardwareMonitor (Good general coverage)
     try:
-        gpus = lhm_reader.read_gpu_stats()
-        if gpus:
-            return gpus
+        lhm_gpus = lhm_reader.read_gpu_stats()
+        if lhm_gpus:
+            all_gpus.extend(lhm_gpus)
     except:
         pass
-    return get_gpu_stats_nvidia_smi()
+    
+    # 3. Try Nvidia SMI (Reliable for Nvidia)
+    try:
+        nvidia_gpus = get_gpu_stats_nvidia_smi()
+        if nvidia_gpus:
+            all_gpus.extend(nvidia_gpus)
+    except:
+        pass
+
+    if not all_gpus:
+        return []
+
+    # Deduplicate based on name (simple fuzzy match) or just prioritize and return unique top
+    # Simple deduplication: If we have multiple entries for "NVIDIA GeForce RTX 3060", take the one with highest load
+    
+    unique_gpus = {}
+    for gpu in all_gpus:
+        name = gpu['name']
+        # Create a normalized key
+        key = name.lower().replace("nvidia", "").replace("amd", "").replace("radeon", "").replace("geforce", "").strip()
+        
+        if key not in unique_gpus:
+            unique_gpus[key] = gpu
+        else:
+            # If we already have this GPU, keep the one with higher load or temp
+            existing = unique_gpus[key]
+            if gpu['load'] > existing['load']:
+                unique_gpus[key] = gpu
+            elif gpu['load'] == existing['load'] and gpu['temperature'] > existing['temperature']:
+                unique_gpus[key] = gpu
+
+    final_list = list(unique_gpus.values())
+    return prioritize_gpus(final_list)
 
 def get_wmi_temp():
     try:
@@ -1308,22 +1363,7 @@ class ServerGUI:
 
 def create_tray_icon():
     """Create system tray icon with FF in TRON style"""
-    try:
-        # Try to load custom icon first
-        if getattr(sys, 'frozen', False):
-            if hasattr(sys, '_MEIPASS'):
-                icon_path = os.path.join(sys._MEIPASS, 'icon.ico')
-            else:
-                icon_path = os.path.join(os.path.dirname(sys.executable), 'icon.ico')
-        else:
-            icon_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'icon.ico')
-            
-        if os.path.exists(icon_path):
-            return Image.open(icon_path)
-    except:
-        pass
-    
-    # Fallback: Create TRON-style FF icon
+    # Always generate TRON-style FF icon as requested
     try:
         from PIL import ImageDraw, ImageFont
         
