@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ChevronRight, ChevronLeft, X, Gauge, Cpu, CircuitBoard, Palette, Smartphone } from 'lucide-react';
+import { ChevronRight, ChevronLeft, X, Gauge, Cpu, CircuitBoard, Palette, Smartphone, Bell } from 'lucide-react';
 import { t } from '../utils/i18n';
 
 const TUTORIAL_STEPS = [
@@ -34,13 +34,23 @@ const TUTORIAL_STEPS = [
         highlight: null
     },
     {
+        id: 'alerts',
+        icon: Bell,
+        iconColor: 'text-red-400',
+        title: 'Alertas Inteligentes',
+        titleEn: 'Smart Alerts',
+        description: 'Configure alertas de temperatura e FPS. O app avisa com sons distintos e pisca a tela se algo estiver errado!',
+        descriptionEn: 'Set temperature and FPS alerts. The app warns with distinct sounds and screen flashes if something is wrong!',
+        highlight: null
+    },
+    {
         id: 'nav',
         icon: Smartphone,
         iconColor: 'text-blue-400',
         title: 'Menu de Navegação',
         titleEn: 'Navigation Menu',
-        description: 'Toque na tela para abrir o menu. Acesse temas, alertas e muito mais!',
-        descriptionEn: 'Tap the screen to open the menu. Access themes, alerts and more!',
+        description: 'Toque na tela para abrir o menu. Acesse temas, histórico, alertas e muito mais!',
+        descriptionEn: 'Tap the screen to open the menu. Access themes, history, alerts and more!',
         highlight: null
     },
 

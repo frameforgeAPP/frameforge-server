@@ -43,9 +43,11 @@ export const PremiumManager = {
             const isFree = await ConfigService.isFreeForEveryone();
             if (isFree) {
                 localStorage.setItem('frameforge_is_free_remote', 'true');
+                window.dispatchEvent(new Event('premium_status_changed'));
                 return true;
             } else {
                 localStorage.removeItem('frameforge_is_free_remote');
+                window.dispatchEvent(new Event('premium_status_changed'));
                 return false;
             }
         } catch (e) {
@@ -81,6 +83,7 @@ export const PremiumManager = {
         // 1. Try Local Validation (Device Hash)
         if (await PremiumManager.validateLocalKey(inputKey)) {
             localStorage.setItem('frameforge_is_pro', 'true');
+            window.dispatchEvent(new Event('premium_status_changed'));
             return { success: true, type: 'local' };
         }
 
@@ -89,6 +92,7 @@ export const PremiumManager = {
             const result = await LicenseService.redeemCode(inputKey);
             if (result.success) {
                 localStorage.setItem('frameforge_is_pro', 'true');
+                window.dispatchEvent(new Event('premium_status_changed'));
                 return { success: true, type: 'online' };
             }
         } catch (e) {
@@ -121,11 +125,15 @@ export const PremiumManager = {
     restorePurchases: async () => {
         // First check if it's free globally
         await PremiumManager.syncRemoteConfig();
-        if (PremiumManager.isPro()) return true;
+        if (PremiumManager.isPro()) {
+            window.dispatchEvent(new Event('premium_status_changed'));
+            return true;
+        }
 
         const hasLicense = await LicenseService.checkLicense();
         if (hasLicense) {
             localStorage.setItem('frameforge_is_pro', 'true');
+            window.dispatchEvent(new Event('premium_status_changed'));
             return true;
         }
         return false;

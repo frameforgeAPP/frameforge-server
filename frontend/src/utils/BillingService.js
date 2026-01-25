@@ -64,6 +64,12 @@ export const BillingService = {
             })
             .finished(transaction => {
                 console.log('Transaction finished:', transaction);
+            })
+            .error(error => {
+                console.error('Store Error:', error);
+                if (error.code !== window.CdvPurchase.ErrorCode.PAYMENT_CANCELLED) {
+                    alert(`Erro na loja: ${error.message}`);
+                }
             });
 
         // Refresh the store

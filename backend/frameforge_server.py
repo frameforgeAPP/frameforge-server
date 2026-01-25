@@ -150,12 +150,13 @@ if getattr(sys, 'frozen', False):
 import tkinter as tk
 import customtkinter as ctk
 from tkinter import ttk, messagebox
-from fastapi import FastAPI
+from fastapi import FastAPI, Body
+from pydantic import BaseModel
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 import uvicorn
-from rtss_reader import RTSSReader
+from rtss_reader import RTSSReader, save_custom_name
 from mahm_reader import MAHMReader
 from lhm_reader import LHMReader
 import pythoncom
@@ -228,7 +229,7 @@ def load_config():
                 return json.load(f)
     except:
         pass
-    return {"start_minimized": False}
+    return {"start_minimized": False, "fps_smoothing": False}
 
 def save_config(config):
     try:
@@ -551,49 +552,99 @@ async def broadcast_stats():
     start_time = asyncio.get_event_loop().time()
     server_stats["status"] = "Running"
     
+    fps_samples = []
+    last_broadcast_time = 0
+    
+    # State for delta calculation
+    last_total_frames = 0
+    last_sample_time = 0
+    
     while monitoring_active:
         try:
-            mahm_data = None
-            try:
-                mahm_data = mahm_reader.read_all_stats()
-            except:
-                pass
-
-            cpu_percent = psutil.cpu_percent(interval=None)
-            cpu_temp = 0
+            current_time = asyncio.get_event_loop().time()
             
-            if mahm_data and mahm_data.get("cpu_usage") is not None:
-                cpu_percent = mahm_data["cpu_usage"]
-            if mahm_data and mahm_data.get("cpu_temp") is not None:
-                cpu_temp = mahm_data["cpu_temp"]
-            else:
-                cpu_temp = await get_cpu_temp()
-
-            cpu_freq = psutil.cpu_freq()
-            ram = psutil.virtual_memory()
-            gpus = get_gpu_stats()
+            # 1. Collect FPS Data
             fps_data = rtss_reader.read_fps()
-            fps = fps_data.get("fps", 0) if fps_data else 0
+            current_fps = fps_data.get("fps", 0) if fps_data else 0
+            current_total_frames = fps_data.get("total_frames", 0) if fps_data else 0
             
-            server_stats["fps"] = fps
-            server_stats["cpu_temp"] = cpu_temp
-            server_stats["gpu_temp"] = gpus[0]["temperature"] if gpus else 0
-            server_stats["clients"] = len(connected_clients)
-            server_stats["uptime"] = int(asyncio.get_event_loop().time() - start_time)
-            server_stats["game"] = fps_data.get("game_name", "") if fps_data else ""
+            fps_samples.append(current_fps)
+            if len(fps_samples) > 20:
+                fps_samples.pop(0)
+
+            # 2. Broadcast every 1.0 second
+            if current_time - last_broadcast_time >= 1.0:
+                time_diff = current_time - last_broadcast_time
+                last_broadcast_time = current_time
+                
+                config = load_config()
+                smoothing_enabled = config.get("fps_smoothing", False)
+                
+                # Calculate FPS based on setting
+                fps = 0
+                if smoothing_enabled:
+                    # Delta calculation (True FPS)
+                    if last_total_frames > 0 and current_total_frames > last_total_frames:
+                         frames_diff = current_total_frames - last_total_frames
+                         # Avoid spikes if time_diff is too small (shouldn't happen)
+                         if time_diff > 0:
+                             fps = int(frames_diff / time_diff)
+                    else:
+                        # Fallback or first run
+                        fps = current_fps
+                else:
+                    # Instantaneous (last read)
+                    fps = current_fps
+                
+                # Update state
+                last_total_frames = current_total_frames
+                
+                # Clear samples (unused in delta mode but kept for fallback)
+                fps_samples = []
+
+                mahm_data = None
+                try:
+                    mahm_data = mahm_reader.read_all_stats()
+                except:
+                    pass
+
+                cpu_percent = psutil.cpu_percent(interval=None)
+                cpu_temp = 0
+                
+                if mahm_data and mahm_data.get("cpu_usage") is not None:
+                    cpu_percent = mahm_data["cpu_usage"]
+                if mahm_data and mahm_data.get("cpu_temp") is not None:
+                    cpu_temp = mahm_data["cpu_temp"]
+                else:
+                    cpu_temp = await get_cpu_temp()
+
+                cpu_freq = psutil.cpu_freq()
+                ram = psutil.virtual_memory()
+                gpus = get_gpu_stats()
+                
+                server_stats["fps"] = fps
+                server_stats["cpu_temp"] = cpu_temp
+                server_stats["gpu_temp"] = gpus[0]["temperature"] if gpus else 0
+                server_stats["clients"] = len(connected_clients)
+                server_stats["uptime"] = int(asyncio.get_event_loop().time() - start_time)
+                server_stats["game"] = fps_data.get("game_name", "") if fps_data else ""
+                
+                data = {
+                    "cpu": {"load": cpu_percent, "temp": cpu_temp, "freq": cpu_freq.current if cpu_freq else 0},
+                    "ram": {"percent": ram.percent, "used_gb": round(ram.used / (1024**3), 1), "total_gb": round(ram.total / (1024**3), 1)},
+                    "gpus": gpus, "fps": fps,
+                    "fps_smoothing": smoothing_enabled,
+                    "rtss_connected": fps_data is not None,
+                    "game": fps_data.get("game_name", "") if fps_data else "",
+                    "game_id": fps_data.get("game_id", "") if fps_data else "",
+                    "afterburner_status": get_afterburner_status(),
+                    "system": {"hostname": platform.node(), "os": f"{platform.system()} {platform.release()}"},
+                    "client_count": len(connected_clients)
+                }
+                await sio.emit('hardware_update', data)
             
-            data = {
-                "cpu": {"load": cpu_percent, "temp": cpu_temp, "freq": cpu_freq.current if cpu_freq else 0},
-                "ram": {"percent": ram.percent, "used_gb": round(ram.used / (1024**3), 1), "total_gb": round(ram.total / (1024**3), 1)},
-                "gpus": gpus, "fps": fps,
-                "rtss_connected": fps_data is not None,
-                "game": fps_data.get("game_name", "") if fps_data else "",
-                "afterburner_status": get_afterburner_status(),
-                "system": {"hostname": platform.node(), "os": f"{platform.system()} {platform.release()}"},
-                "client_count": len(connected_clients)
-            }
-            await sio.emit('hardware_update', data)
-            await asyncio.sleep(1)
+            # Sleep 100ms (10Hz sampling)
+            await asyncio.sleep(0.1)
         except:
             await asyncio.sleep(1)
 
@@ -605,6 +656,11 @@ async def connect(sid, environ, auth=None):
 @sio.event
 async def disconnect(sid):
     connected_clients.discard(sid)
+
+@sio.event
+async def ping(sid):
+    """Simple ping-pong for latency check"""
+    return "pong"
 
 @sio.event
 async def request_data(sid):
@@ -629,12 +685,15 @@ async def request_data(sid):
         fps_data = rtss_reader.read_fps()
         fps = fps_data.get("fps", 0) if fps_data else 0
         
+        config = load_config()
         data = {
             "cpu": {"load": cpu_percent, "temp": cpu_temp, "freq": cpu_freq.current if cpu_freq else 0},
             "ram": {"percent": ram.percent, "used_gb": round(ram.used / (1024**3), 1), "total_gb": round(ram.total / (1024**3), 1)},
             "gpus": gpus, "fps": fps,
+            "fps_smoothing": config.get("fps_smoothing", False),
             "rtss_connected": fps_data is not None,
             "game": fps_data.get("game_name", "") if fps_data else "",
+            "game_id": fps_data.get("game_id", "") if fps_data else "",
             "afterburner_status": get_afterburner_status(),
             "system": {"hostname": platform.node(), "os": f"{platform.system()} {platform.release()}"},
             "client_count": len(connected_clients)
@@ -642,6 +701,71 @@ async def request_data(sid):
         await sio.emit('hardware_update', data, to=sid)
     except Exception as e:
         print(f"Error sending initial data: {e}")
+
+@sio.event
+async def set_fps_smoothing(sid, enabled):
+    """Update FPS smoothing setting from client"""
+    try:
+        config = load_config()
+        config["fps_smoothing"] = bool(enabled)
+        save_config(config)
+        
+        # Update GUI if running
+        if gui_window and hasattr(gui_window, 'fps_smoothing_var'):
+            gui_window.fps_smoothing_var.set(bool(enabled))
+            
+    except Exception as e:
+        print(f"Error setting FPS smoothing: {e}")
+
+@sio.event
+async def set_game_name(sid, data):
+    """Update custom game name mapping"""
+    try:
+        executable = data.get('executable')
+        name = data.get('name')
+        if executable and name:
+            if save_custom_name(executable, name):
+                # Broadcast update to all clients so they refresh immediately
+                await sio.emit('game_name_updated', {'executable': executable, 'name': name})
+    except Exception as e:
+        print(f"Error setting game name: {e}")
+
+class GameNameUpdate(BaseModel):
+    executable: str
+    name: str
+
+@app.post("/api/set-game-name")
+async def api_set_game_name(update: GameNameUpdate):
+    """Update custom game name mapping via HTTP"""
+    try:
+        if save_custom_name(update.executable, update.name):
+            # Broadcast update to all clients so they refresh immediately
+            await sio.emit('game_name_updated', {'executable': update.executable, 'name': update.name})
+            return {"success": True}
+        return {"success": False}
+    except Exception as e:
+        print(f"Error setting game name API: {e}")
+        return {"success": False, "error": str(e)}
+
+class FpsSmoothingUpdate(BaseModel):
+    enabled: bool
+
+@app.post("/api/set-fps-smoothing")
+async def api_set_fps_smoothing(update: FpsSmoothingUpdate):
+    """Update FPS smoothing setting via HTTP"""
+    try:
+        config = load_config()
+        config["fps_smoothing"] = update.enabled
+        save_config(config)
+        
+        # Update GUI if running
+        if gui_window and hasattr(gui_window, 'fps_smoothing_var'):
+            gui_window.fps_smoothing_var.set(update.enabled)
+            
+        return {"success": True}
+    except Exception as e:
+        print(f"Error setting FPS smoothing API: {e}")
+        return {"success": False, "error": str(e)}
 
 @app.on_event("startup")
 async def startup_event():
@@ -695,6 +819,62 @@ def generate_qr_code(data, size=120):
     qr_img = qr.make_image(fill_color='black', back_color='white')
     qr_img = qr_img.resize((size, size))
     return qr_img
+
+class CTkToolTip:
+    """
+    Tooltip class for CustomTkinter widgets
+    """
+    def __init__(self, widget, text, delay=500):
+        self.widget = widget
+        self.text = text
+        self.delay = delay
+        self.tooltip_window = None
+        self.id = None
+        self.x = self.y = 0
+        self._id = None
+
+        self.widget.bind("<Enter>", self.schedule)
+        self.widget.bind("<Leave>", self.hide)
+        self.widget.bind("<ButtonPress>", self.hide)
+
+    def schedule(self, event=None):
+        self.unschedule()
+        self._id = self.widget.after(self.delay, self.show)
+
+    def unschedule(self):
+        id = self._id
+        self._id = None
+        if id:
+            self.widget.after_cancel(id)
+
+    def show(self, event=None):
+        x, y, cx, cy = self.widget.bbox("insert")
+        x += self.widget.winfo_rootx() + 25
+        y += self.widget.winfo_rooty() + 25
+        
+        # Create tooltip window
+        self.tooltip_window = tk.Toplevel(self.widget)
+        self.tooltip_window.wm_overrideredirect(True)
+        self.tooltip_window.wm_geometry(f"+{x}+{y}")
+        
+        # Tooltip content
+        label = tk.Label(
+            self.tooltip_window, 
+            text=self.text, 
+            justify='left',
+            background="#1e293b", 
+            foreground="#e2e8f0",
+            relief='solid', 
+            borderwidth=1,
+            font=("Arial", 9)
+        )
+        label.pack(ipadx=5, ipady=3)
+
+    def hide(self, event=None):
+        self.unschedule()
+        if self.tooltip_window:
+            self.tooltip_window.destroy()
+            self.tooltip_window = None
 
 class ServerGUI:
     """Modern server control panel using CustomTkinter"""
@@ -1054,25 +1234,43 @@ class ServerGUI:
         footer = ctk.CTkFrame(parent, fg_color="transparent")
         footer.pack(fill='x', pady=(5, 0))
         
-        # Checkboxes
-        cb_row = ctk.CTkFrame(footer, fg_color="transparent")
-        cb_row.pack(anchor='w')
+        # Checkboxes - Row 1
+        cb_row1 = ctk.CTkFrame(footer, fg_color="transparent")
+        cb_row1.pack(anchor='w', pady=(0, 5))
         
         self.auto_start_var = ctk.BooleanVar(value=is_auto_start_enabled())
-        ctk.CTkCheckBox(cb_row, text=t("start_with_windows"),
+        cb_auto = ctk.CTkCheckBox(cb_row1, text=t("start_with_windows"),
                        variable=self.auto_start_var,
                        font=ctk.CTkFont(size=11),
                        fg_color=self.colors['accent_steam'],
                        hover_color=self.colors['accent_light'],
-                       command=self._toggle_auto_start).pack(side='left')
+                       command=self._toggle_auto_start)
+        cb_auto.pack(side='left')
+        CTkToolTip(cb_auto, "Inicia o servidor automaticamente ao ligar o PC.")
         
         self.start_minimized_var = ctk.BooleanVar(value=self.config.get("start_minimized", False))
-        ctk.CTkCheckBox(cb_row, text=t("minimized"),
+        cb_min = ctk.CTkCheckBox(cb_row1, text=t("minimized"),
                        variable=self.start_minimized_var,
                        font=ctk.CTkFont(size=11),
                        fg_color=self.colors['accent_steam'],
                        hover_color=self.colors['accent_light'],
-                       command=self._toggle_start_minimized).pack(side='left', padx=(15, 0))
+                       command=self._toggle_start_minimized)
+        cb_min.pack(side='left', padx=(15, 0))
+        CTkToolTip(cb_min, "Inicia o servidor minimizado na bandeja do sistema.")
+        
+        # Checkboxes - Row 2
+        cb_row2 = ctk.CTkFrame(footer, fg_color="transparent")
+        cb_row2.pack(anchor='w')
+        
+        self.fps_smoothing_var = ctk.BooleanVar(value=self.config.get("fps_smoothing", False))
+        cb_smooth = ctk.CTkCheckBox(cb_row2, text="Suavizar FPS",
+                       variable=self.fps_smoothing_var,
+                       font=ctk.CTkFont(size=11),
+                       fg_color=self.colors['accent_steam'],
+                       hover_color=self.colors['accent_light'],
+                       command=self._toggle_fps_smoothing)
+        cb_smooth.pack(side='left')
+        CTkToolTip(cb_smooth, "Calcula a média de FPS do último segundo para maior estabilidade (igual overlays de jogos).")
         
         # Buttons Row
         btn_row = ctk.CTkFrame(footer, fg_color="transparent")
@@ -1138,6 +1336,10 @@ class ServerGUI:
     
     def toggle_start_minimized(self):
         self._toggle_start_minimized()
+
+    def _toggle_fps_smoothing(self):
+        self.config["fps_smoothing"] = self.fps_smoothing_var.get()
+        save_config(self.config)
         
     def _toggle_theme(self):
         new_theme = "light" if self.current_theme == "dark" else "dark"
@@ -1496,6 +1698,7 @@ if __name__ == "__main__":
         
         # 2. Initialize GUI (Main Thread)
         gui = ServerGUI()
+        gui_window = gui # Global reference for socket updates
         
         # 3. Start Tray in Background Thread
         tray_thread = threading.Thread(target=run_tray, args=(gui,), daemon=True)

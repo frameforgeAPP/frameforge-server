@@ -1,7 +1,7 @@
 import { X, Save, Cpu, HardDrive, CircuitBoard } from 'lucide-react';
 import { t } from '../utils/i18n';
 
-export default function HardwareSettings({ onClose, onSave, initialLabels }) {
+export default function HardwareSettings({ onClose, onSave, initialLabels, fpsSmoothing, onToggleFpsSmoothing }) {
     const [labels, setLabels] = useState(initialLabels || { cpu: 'CPU', gpu: 'GPU', ram: 'RAM' });
 
     const handleChange = (key, value) => {
@@ -72,6 +72,22 @@ export default function HardwareSettings({ onClose, onSave, initialLabels }) {
                         />
                     </div>
                 </div>
+
+                {/* FPS Smoothing Toggle */}
+                {onToggleFpsSmoothing && (
+                    <div className="mb-6 p-4 bg-gray-800/50 rounded-xl border border-gray-700 flex items-center justify-between">
+                        <div>
+                            <span className="text-white font-bold block">Suavizar FPS</span>
+                            <span className="text-xs text-gray-400">Média de 1s (Igual Overlay)</span>
+                        </div>
+                        <button
+                            onClick={() => onToggleFpsSmoothing(!fpsSmoothing)}
+                            className={`w-12 h-6 rounded-full transition-colors relative ${fpsSmoothing ? 'bg-cyan-500' : 'bg-gray-600'}`}
+                        >
+                            <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-transform ${fpsSmoothing ? 'translate-x-7' : 'translate-x-1'}`} />
+                        </button>
+                    </div>
+                )}
 
                 <button
                     onClick={handleSave}

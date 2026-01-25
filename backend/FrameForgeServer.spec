@@ -5,8 +5,8 @@ a = Analysis(
     ['frameforge_server.py'],
     pathex=[],
     binaries=[],
-    datas=[('rtss_reader.py', '.'), ('mahm_reader.py', '.'), ('lhm_reader.py', '.')],
-    hiddenimports=['win32com.client', 'pythoncom', 'pystray._win32', 'PIL._tkinter_finder'],
+    datas=[],
+    hiddenimports=[],
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
@@ -35,5 +35,4 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
-    icon=['assets\\icon.ico'],
 )

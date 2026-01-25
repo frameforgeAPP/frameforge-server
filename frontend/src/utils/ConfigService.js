@@ -47,9 +47,9 @@ export const ConfigService = {
 
             // Default values (fallback)
             const defaults = {
-                premiumThemes: ['matrix', 'roblox', 'minecraft'],
-                premiumBackgrounds: ['matrix', 'embers', 'rain'],
-                premiumFeatures: ['alerts', 'history', 'rgbBorder']
+                premiumThemes: [],
+                premiumBackgrounds: [],
+                premiumFeatures: []
             };
 
             if (configSnap.exists()) {
@@ -64,9 +64,9 @@ export const ConfigService = {
         } catch (error) {
             console.error("Error fetching premium config:", error);
             return {
-                premiumThemes: ['matrix', 'roblox', 'minecraft'],
-                premiumBackgrounds: ['matrix', 'embers', 'rain'],
-                premiumFeatures: ['alerts', 'history', 'rgbBorder']
+                premiumThemes: [],
+                premiumBackgrounds: [],
+                premiumFeatures: []
             };
         }
     }

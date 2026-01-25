@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Heart, Copy, ExternalLink, X, Check, Sparkles, Coffee, Zap, Gift, Star, Smartphone, Key, Unlock, Code, Smile } from 'lucide-react';
+import { Heart, Copy, ExternalLink, X, Check, Sparkles, Coffee, Zap, Gift, Star, Smartphone, Key, Unlock, Code, Smile, RotateCcw } from 'lucide-react';
 import { PremiumManager } from '../utils/PremiumManager';
 import QRCode from 'react-qr-code';
 import { Capacitor } from '@capacitor/core';
@@ -247,6 +247,20 @@ export default function DonationModal({ onClose }) {
                                 <span className="text-sm font-medium opacity-90">{t('send_coffee')}</span>
                                 <span className="text-xs opacity-75">{t('via_google_play')}</span>
                             </div>
+                        </button>
+
+                        {/* Restore Purchases Button */}
+                        <button
+                            onClick={() => {
+                                import('../utils/BillingService').then(({ BillingService }) => {
+                                    BillingService.restore();
+                                    alert("Verificando compras...");
+                                });
+                            }}
+                            className="w-full py-3 bg-gray-800/50 hover:bg-gray-700/50 text-gray-400 font-medium rounded-xl transition-all border border-gray-700/50 flex items-center justify-center gap-2 text-sm"
+                        >
+                            <RotateCcw size={16} />
+                            Restaurar Compras
                         </button>
 
                         {/* Device ID Display (Always Visible) */}

@@ -1,6 +1,10 @@
 import ctypes
 import mmap
 import struct
+import json
+import os
+
+CUSTOM_NAMES_FILE = "custom_game_names.json"
 
 # RTSS Shared Memory Name
 RTSS_SHARED_MEMORY_NAME = "RTSSSharedMemoryV2"
@@ -52,6 +56,31 @@ GAME_NAME_MAPPING = {
     "ffxv": "Final Fantasy XV",
     "ff7remake": "Final Fantasy VII Remake",
 }
+
+def load_custom_names():
+    if os.path.exists(CUSTOM_NAMES_FILE):
+        try:
+            with open(CUSTOM_NAMES_FILE, 'r', encoding='utf-8') as f:
+                return json.load(f)
+        except:
+            return {}
+    return {}
+
+def save_custom_name(executable, name):
+    custom_names = load_custom_names()
+    custom_names[executable.lower()] = name
+    try:
+        with open(CUSTOM_NAMES_FILE, 'w', encoding='utf-8') as f:
+            json.dump(custom_names, f, indent=4)
+        # Update global mapping
+        GAME_NAME_MAPPING.update(custom_names)
+        return True
+    except Exception as e:
+        print(f"Error saving custom name: {e}")
+        return False
+
+# Load custom names on startup
+GAME_NAME_MAPPING.update(load_custom_names())
 
 class RTSS_SHARED_MEMORY_OSD_ENTRY(ctypes.Structure):
     _fields_ = [
@@ -142,6 +171,7 @@ class RTSSReader:
 
             max_fps = 0
             active_game = ""
+            active_id = ""
             
             for i in range(header.dwAppArrSize):
                 offset = header.dwAppArrOffset + (i * header.dwAppEntrySize)
@@ -172,17 +202,19 @@ class RTSSReader:
                                     name = GAME_NAME_MAPPING[lower_name]
                                     
                                 active_game = name
+                                active_id = lower_name
                             except:
                                 pass
                             
-            return {'fps': max_fps, 'game_name': active_game}
+                            
+            return {'fps': max_fps, 'game_name': active_game, 'game_id': active_id, 'total_frames': entry.dwFrames}
 
         except Exception as e:
             # print(f"Error reading RTSS: {e}")
             # If reading fails, try to reconnect next time
             self.map_file.close()
             self.map_file = None
-            return {'fps': 0, 'game_name': ""}
+            return {'fps': 0, 'game_name': "", 'game_id': ""}
 
 if __name__ == "__main__":
     reader = RTSSReader()

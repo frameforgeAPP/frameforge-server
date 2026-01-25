@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Scanner } from '@yudiel/react-qr-scanner';
-import { Wifi, QrCode, Monitor, HelpCircle, Power, Info, Copy, Mail, MessageCircle, Share2, ExternalLink, ArrowLeft } from 'lucide-react';
+import { Wifi, QrCode, Monitor, HelpCircle, Power, Info, Copy, Mail, MessageCircle, Share2, ExternalLink, ArrowLeft, Clock as ClockIcon } from 'lucide-react';
+import PingTest from './PingTest';
 import { Share } from '@capacitor/share';
 import { t } from '../utils/i18n';
 import { checkAfterburnerStatus, getStatusColor, getStatusMessage } from '../utils/afterburnerUtils';
@@ -9,7 +10,7 @@ import AfterburnerSetupModal from './AfterburnerSetupModal';
 const SERVER_URL = 'https://github.com/frameforgeAPP/frameforge-server/releases';
 const AFTERBURNER_URL = 'https://www.msi.com/Landing/afterburner/graphics-cards';
 
-export default function ConnectionScreen({ onConnect, onDemo, serverAddress, setServerAddress, cameFromDashboard, onReconnect }) {
+export default function ConnectionScreen({ onConnect, onDemo, serverAddress, setServerAddress, cameFromDashboard, onReconnect, onOpenClock }) {
     const [showScanner, setShowScanner] = useState(false);
     const [manualIp, setManualIp] = useState(serverAddress || '');
     const [showManual, setShowManual] = useState(false);
@@ -20,6 +21,17 @@ export default function ConnectionScreen({ onConnect, onDemo, serverAddress, set
     const [copiedServer, setCopiedServer] = useState(false);
     const [isConnecting, setIsConnecting] = useState(false);
     const [connectionError, setConnectionError] = useState('');
+    const [showFallbackHint, setShowFallbackHint] = useState(false);
+
+    // Auto-discovery fallback hint
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            if (!serverAddress) {
+                setShowFallbackHint(true);
+            }
+        }, 5000);
+        return () => clearTimeout(timer);
+    }, [serverAddress]);
 
     // Check Afterburner status when server address is available
     useEffect(() => {
@@ -166,9 +178,17 @@ export default function ConnectionScreen({ onConnect, onDemo, serverAddress, set
             <div className="z-10 w-full max-w-md flex flex-col gap-4">
                 {/* Header */}
                 <div className="text-center mb-2">
-                    <h1 className="text-3xl font-black tracking-tighter mb-1 bg-gradient-to-r from-cyan-400 via-blue-500 to-cyan-400 bg-clip-text text-transparent">
-                        FrameForge
-                    </h1>
+                    <div className="flex items-center justify-center gap-4 mb-1">
+                        {/* Ping Test (Moved here) */}
+                        {(manualIp || serverAddress) && (
+                            <div className="flex items-center">
+                                <PingTest serverAddress={manualIp || serverAddress} compact={true} />
+                            </div>
+                        )}
+                        <h1 className="text-3xl font-black tracking-tighter bg-gradient-to-r from-cyan-400 via-blue-500 to-cyan-400 bg-clip-text text-transparent">
+                            FrameForge
+                        </h1>
+                    </div>
                     <p className="text-cyan-500/60 text-xs tracking-widest uppercase">{t('performance_monitor')}</p>
 
                     {/* Demo Mode Button */}
@@ -191,6 +211,30 @@ export default function ConnectionScreen({ onConnect, onDemo, serverAddress, set
                         </button>
                     )}
                 </div>
+
+                {/* Ping Test (if address available) */}
+
+
+                {/* Clock Button (Top Right) */}
+                <button
+                    onClick={onOpenClock}
+                    className="absolute top-6 right-4 p-2 bg-gray-800/50 hover:bg-gray-700/50 rounded-full text-cyan-400 transition-all border border-cyan-800/30"
+                    title={t('open_clock')}
+                >
+                    <ClockIcon size={20} />
+                </button>
+
+                {/* Fallback Hint */}
+                {showFallbackHint && !manualIp && (
+                    <div className="bg-orange-900/20 border border-orange-700/30 rounded-xl p-3 mb-2 animate-fade-in">
+                        <div className="flex items-start gap-2">
+                            <HelpCircle size={14} className="text-orange-400 mt-0.5 flex-shrink-0" />
+                            <p className="text-gray-400 text-xs leading-relaxed">
+                                <span className="text-orange-300 font-medium">{t('cant_find_server')}</span> {t('ap_isolation_hint')}
+                            </p>
+                        </div>
+                    </div>
+                )}
 
                 {/* STEP 1: MSI Afterburner */}
                 <div className="bg-gray-900/50 border border-cyan-800/50 rounded-2xl p-4">
@@ -219,18 +263,10 @@ export default function ConnectionScreen({ onConnect, onDemo, serverAddress, set
                     </div>
 
                     {/* Share Options */}
-                    <div className="grid grid-cols-3 gap-2">
-                        <button onClick={() => handleShareEmail(AFTERBURNER_URL, 'MSI Afterburner')} className="flex flex-col items-center gap-1 p-2 bg-gray-800/50 hover:bg-gray-700/50 rounded-lg transition-all border border-cyan-800/30">
-                            <Mail size={14} className="text-cyan-400" />
-                            <span className="text-[10px] text-gray-400">{t('email')}</span>
-                        </button>
-                        <button onClick={() => handleShareWhatsApp(AFTERBURNER_URL, 'MSI Afterburner')} className="flex flex-col items-center gap-1 p-2 bg-gray-800/50 hover:bg-gray-700/50 rounded-lg transition-all border border-cyan-800/30">
-                            <MessageCircle size={14} className="text-cyan-400" />
-                            <span className="text-[10px] text-gray-400">{t('whatsapp')}</span>
-                        </button>
-                        <button onClick={() => handleShareNative(AFTERBURNER_URL, 'MSI Afterburner')} className="flex flex-col items-center gap-1 p-2 bg-gray-800/50 hover:bg-gray-700/50 rounded-lg transition-all border border-cyan-800/30">
+                    <div className="grid grid-cols-1 gap-2">
+                        <button onClick={() => handleShareNative(AFTERBURNER_URL, 'MSI Afterburner')} className="flex flex-row items-center justify-center gap-2 p-2 bg-gray-800/50 hover:bg-gray-700/50 rounded-lg transition-all border border-cyan-800/30">
                             <Share2 size={14} className="text-cyan-400" />
-                            <span className="text-[10px] text-gray-400">{t('others')}</span>
+                            <span className="text-xs text-gray-400">{t('share')}</span>
                         </button>
                     </div>
                 </div>
@@ -263,18 +299,10 @@ export default function ConnectionScreen({ onConnect, onDemo, serverAddress, set
                     </div>
 
                     {/* Share Options */}
-                    <div className="grid grid-cols-3 gap-2">
-                        <button onClick={() => handleShareEmail(SERVER_URL, 'FrameForge Server')} className="flex flex-col items-center gap-1 p-2 bg-gray-800/50 hover:bg-gray-700/50 rounded-lg transition-all border border-cyan-800/30">
-                            <Mail size={14} className="text-cyan-400" />
-                            <span className="text-[10px] text-gray-400">{t('email')}</span>
-                        </button>
-                        <button onClick={() => handleShareWhatsApp(SERVER_URL, 'FrameForge Server')} className="flex flex-col items-center gap-1 p-2 bg-gray-800/50 hover:bg-gray-700/50 rounded-lg transition-all border border-cyan-800/30">
-                            <MessageCircle size={14} className="text-cyan-400" />
-                            <span className="text-[10px] text-gray-400">{t('whatsapp')}</span>
-                        </button>
-                        <button onClick={() => handleShareNative(SERVER_URL, 'FrameForge Server')} className="flex flex-col items-center gap-1 p-2 bg-gray-800/50 hover:bg-gray-700/50 rounded-lg transition-all border border-cyan-800/30">
+                    <div className="grid grid-cols-1 gap-2">
+                        <button onClick={() => handleShareNative(SERVER_URL, 'FrameForge Server')} className="flex flex-row items-center justify-center gap-2 p-2 bg-gray-800/50 hover:bg-gray-700/50 rounded-lg transition-all border border-cyan-800/30">
                             <Share2 size={14} className="text-cyan-400" />
-                            <span className="text-[10px] text-gray-400">{t('others')}</span>
+                            <span className="text-xs text-gray-400">{t('share')}</span>
                         </button>
                     </div>
                 </div>

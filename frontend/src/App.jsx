@@ -10,6 +10,9 @@ import TutorialOverlay from './components/TutorialOverlay';
 import Clock from './components/Clock';
 import { generateMockData } from './utils/mockData';
 import { PremiumManager } from './utils/PremiumManager';
+import { syncSessions } from './utils/sessionStorage';
+import { auth } from './utils/firebaseConfig';
+import { onAuthStateChanged } from "firebase/auth";
 
 // Simple Error Boundary Component
 // ErrorBoundary moved to components/ErrorBoundary.jsx
@@ -68,7 +71,21 @@ function App() {
 
   // Initialize PremiumManager (Persistent Device ID)
   useEffect(() => {
+    // Initialize Premium Manager
     PremiumManager.initialize();
+
+    // Check for existing purchases/licenses
+    PremiumManager.restorePurchases();
+
+    // Sync sessions when auth is ready
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      if (user) {
+        console.log("User authenticated, syncing sessions...");
+        syncSessions();
+      }
+    });
+
+    return () => unsubscribe();
   }, []);
 
   // Real Connection Logic
@@ -296,6 +313,22 @@ function App() {
     } catch (e) { }
   };
 
+  // Ping Server Function
+  const pingServer = async () => {
+    if (socketRef.current && connected) {
+      const start = Date.now();
+      return new Promise((resolve) => {
+        // Timeout after 2s
+        const timeout = setTimeout(() => resolve(-1), 2000);
+        socketRef.current.emit('ping', () => {
+          clearTimeout(timeout);
+          resolve(Date.now() - start);
+        });
+      });
+    }
+    return -1;
+  };
+
   return (
     <div
       className="min-h-screen bg-gray-900 text-white"
@@ -327,6 +360,7 @@ function App() {
             setServerAddress={setServerAddress}
             cameFromDashboard={cameFromDashboard}
             onReconnect={handleReconnect}
+            onOpenClock={() => setShowClockOnDisconnect(true)}
           />
         )
       ) : (
@@ -340,6 +374,7 @@ function App() {
           isDemo={isDemo}
           exitDemo={() => setIsDemo(false)}
           onReturnToConfig={handleReturnToConfig}
+          pingServer={pingServer}
         />
       )}
     </div>

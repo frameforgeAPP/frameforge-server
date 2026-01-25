@@ -1,26 +1,40 @@
 import React, { useState, useEffect } from 'react';
 import { X, Bell, BellOff, Thermometer, Cpu, CircuitBoard, Gauge, Volume2, VolumeX, Vibrate, RotateCcw, Lock, Unlock, Coffee } from 'lucide-react';
 import { getAlertsSettings, saveAlertsSettings, resetAlertsSettings, triggerVibration, triggerSound } from '../utils/alertsUtils';
+import { PremiumManager } from '../utils/PremiumManager';
 import { t } from '../utils/i18n';
 import { analytics } from '../utils/firebaseConfig';
 import { logEvent } from 'firebase/analytics';
 import UnlockModal from './UnlockModal';
+import { ConfigService } from '../utils/ConfigService';
 
 export default function AlertsSettings({ isOpen, onClose }) {
     const [settings, setSettings] = useState(getAlertsSettings());
     const [isPro, setIsPro] = useState(false);
     const [showUnlockModal, setShowUnlockModal] = useState(false);
+    const [premiumFeatures, setPremiumFeatures] = useState([]);
 
     useEffect(() => {
         if (isOpen) {
             setSettings(getAlertsSettings());
-            // Check Pro Status
-            const proStatus = localStorage.getItem('frameforge_is_pro');
-            if (proStatus === 'true') {
-                setIsPro(true);
-            }
         }
     }, [isOpen]);
+
+    useEffect(() => {
+        const checkPro = () => {
+            setIsPro(PremiumManager.isPro());
+        };
+
+        checkPro();
+
+        // Fetch Remote Config
+        ConfigService.getPremiumConfiguration().then(config => {
+            setPremiumFeatures(config.premiumFeatures);
+        });
+
+        window.addEventListener('premium_status_changed', checkPro);
+        return () => window.removeEventListener('premium_status_changed', checkPro);
+    }, []);
 
     const updateSetting = (key, value) => {
         const newSettings = { ...settings, [key]: value };
@@ -49,7 +63,7 @@ export default function AlertsSettings({ isOpen, onClose }) {
             <div className="bg-gray-900 border border-gray-800 rounded-2xl max-w-md w-full max-h-[85vh] overflow-hidden flex flex-col relative">
 
                 {/* PRO LOCK OVERLAY for Non-Pro Users */}
-                {!isPro && (
+                {!isPro && premiumFeatures.includes('alerts') && (
                     <div className="absolute inset-0 z-10 bg-black/60 backdrop-blur-[2px] flex flex-col items-center justify-center p-6 text-center">
                         <div className="bg-gray-900 border border-yellow-500/30 p-6 rounded-2xl shadow-2xl max-w-xs w-full">
                             <Lock className="w-12 h-12 text-yellow-500 mx-auto mb-4" />
@@ -63,6 +77,19 @@ export default function AlertsSettings({ isOpen, onClose }) {
                             >
                                 <Unlock size={18} />
                                 Desbloquear Agora
+                            </button>
+
+                            <button
+                                onClick={() => {
+                                    import('../utils/BillingService').then(({ BillingService }) => {
+                                        BillingService.restore();
+                                        alert("Verificando compras...");
+                                    });
+                                }}
+                                className="w-full mt-2 py-2 bg-gray-800 hover:bg-gray-700 text-gray-400 font-medium rounded-xl transition-colors flex items-center justify-center gap-2 text-xs border border-gray-700"
+                            >
+                                <RotateCcw size={14} />
+                                Restaurar Compras
                             </button>
 
                             {/* Close Button for Premium Modal */}
@@ -132,7 +159,14 @@ export default function AlertsSettings({ isOpen, onClose }) {
                                     onChange={(e) => updateSetting('cpuTempLimit', parseInt(e.target.value))}
                                     className="flex-1 h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-orange-500"
                                 />
-                                <span className="text-xl font-bold text-orange-400 w-16 text-right">{settings.cpuTempLimit}°C</span>
+                                <input
+                                    type="number"
+                                    min="60"
+                                    max="100"
+                                    value={settings.cpuTempLimit}
+                                    onChange={(e) => updateSetting('cpuTempLimit', parseInt(e.target.value))}
+                                    className="w-16 bg-gray-900 border border-gray-600 rounded px-2 py-1 text-right text-orange-400 font-bold outline-none focus:border-orange-500"
+                                />
                             </div>
                         </div>
 
@@ -160,7 +194,14 @@ export default function AlertsSettings({ isOpen, onClose }) {
                                     onChange={(e) => updateSetting('gpuTempLimit', parseInt(e.target.value))}
                                     className="flex-1 h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-green-500"
                                 />
-                                <span className="text-xl font-bold text-green-400 w-16 text-right">{settings.gpuTempLimit}°C</span>
+                                <input
+                                    type="number"
+                                    min="60"
+                                    max="100"
+                                    value={settings.gpuTempLimit}
+                                    onChange={(e) => updateSetting('gpuTempLimit', parseInt(e.target.value))}
+                                    className="w-16 bg-gray-900 border border-gray-600 rounded px-2 py-1 text-right text-green-400 font-bold outline-none focus:border-green-500"
+                                />
                             </div>
                         </div>
 
@@ -182,13 +223,20 @@ export default function AlertsSettings({ isOpen, onClose }) {
                             <div className={`flex items-center gap-4 ${settings.fpsAlertEnabled === false ? 'opacity-50 pointer-events-none' : ''}`}>
                                 <input
                                     type="range"
-                                    min="15"
-                                    max="60"
+                                    min="1"
+                                    max="900"
                                     value={settings.fpsLowLimit}
                                     onChange={(e) => updateSetting('fpsLowLimit', parseInt(e.target.value))}
                                     className="flex-1 h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-red-500"
                                 />
-                                <span className="text-xl font-bold text-red-400 w-16 text-right">{settings.fpsLowLimit}</span>
+                                <input
+                                    type="number"
+                                    min="1"
+                                    max="900"
+                                    value={settings.fpsLowLimit}
+                                    onChange={(e) => updateSetting('fpsLowLimit', parseInt(e.target.value))}
+                                    className="w-16 bg-gray-900 border border-gray-600 rounded px-2 py-1 text-right text-red-400 font-bold outline-none focus:border-red-500"
+                                />
                             </div>
                         </div>
                     </div>

@@ -46,7 +46,11 @@ const translations = {
         "share_server_subject": "FrameForge Server - Download",
         "share_server_body": "Download FrameForge Server on your PC:\n\n{url}\n\nThis program is needed to send FPS data to the mobile app.",
         "share_whatsapp_text": "🎮 FrameForge Server\n\nDownload on your PC to see FPS on mobile:\n{url}",
+        "share_whatsapp_text": "🎮 FrameForge Server\n\nDownload on your PC to see FPS on mobile:\n{url}",
         "share_dialog_title": "Share server link",
+        "cant_find_server": "Can't find server?",
+        "ap_isolation_hint": "This might be due to AP Isolation on your router. Try connecting manually.",
+        "open_clock": "Open Clock",
 
         // Dashboard
         "waiting_connection": "Waiting for connection...",
@@ -125,6 +129,10 @@ const translations = {
         "no_sessions": "No sessions recorded",
         "sessions_info": "Sessions are saved automatically when you play",
         "clear_all_history": "Clear All History",
+        "group_by_game": "Group by Game",
+        "all_time": "All Time",
+        "last_7_days": "Last 7 Days",
+        "last_30_days": "Last 30 Days",
 
         // Export Report
         "performance_report": "Report",
@@ -175,6 +183,12 @@ const translations = {
         "code_invalid": "Invalid or expired code.",
         "premium_unlocked": "Premium features unlocked successfully!",
         "error_donation": "Error starting donation: ",
+        "edit_game_name": "Edit Game Name",
+        "executable": "Original Executable",
+        "display_name": "Display Name",
+        "save": "Save",
+        "saved_success": "Saved successfully!",
+        "error_saving": "Error saving: ",
     },
     pt: {
         // Connection Screen
@@ -218,7 +232,11 @@ const translations = {
         "share_server_subject": "FrameForge Server - Download",
         "share_server_body": "Baixe o FrameForge Server no seu PC:\n\n{url}\n\nEste programa é necessário para enviar os dados de FPS para o app no celular.",
         "share_whatsapp_text": "🎮 FrameForge Server\n\nBaixe no seu PC para ver o FPS no celular:\n{url}",
+        "share_whatsapp_text": "🎮 FrameForge Server\n\nBaixe no seu PC para ver o FPS no celular:\n{url}",
         "share_dialog_title": "Compartilhar link do servidor",
+        "cant_find_server": "Não encontrou o servidor?",
+        "ap_isolation_hint": "Pode ser isolamento de AP no roteador. Tente conectar manualmente.",
+        "open_clock": "Abrir Relógio",
 
         // Dashboard
         "waiting_connection": "Aguardando conexão...",
@@ -297,6 +315,10 @@ const translations = {
         "no_sessions": "Nenhuma sessão registrada",
         "sessions_info": "As sessões são salvas automaticamente quando você joga",
         "clear_all_history": "Limpar Todo Histórico",
+        "group_by_game": "Agrupar por Jogo",
+        "all_time": "Todo o período",
+        "last_7_days": "Últimos 7 dias",
+        "last_30_days": "Últimos 30 dias",
 
         // Export Report
         "performance_report": "Relatório",
@@ -347,6 +369,12 @@ const translations = {
         "code_invalid": "Código inválido ou expirado.",
         "premium_unlocked": "Funcionalidades Premium desbloqueadas com sucesso!",
         "error_donation": "Erro ao iniciar doação: ",
+        "edit_game_name": "Editar Nome do Jogo",
+        "executable": "Executável Original",
+        "display_name": "Nome de Exibição",
+        "save": "Salvar",
+        "saved_success": "Salvo com sucesso!",
+        "error_saving": "Erro ao salvar: ",
     }
 };
 

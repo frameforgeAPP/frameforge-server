@@ -10,8 +10,8 @@ import { ConfigService } from '../utils/ConfigService';
 import UnlockModal from './UnlockModal';
 
 // Default Premium Themes (Fallback)
-const DEFAULT_PREMIUM_THEMES = ['matrix', 'roblox', 'minecraft'];
-const DEFAULT_PREMIUM_BACKGROUNDS = ['matrix', 'embers', 'rain'];
+const DEFAULT_PREMIUM_THEMES = [];
+const DEFAULT_PREMIUM_BACKGROUNDS = [];
 
 export default function ThemeSelector({ currentTheme, onSelectTheme, onClose, currentBackground, onSelectBackground, onUploadBackground, globalSettings, onUpdateGlobalSettings, isDarkMode, onToggleDarkMode, onOpenClock, customColors, onUpdateCustomColor, hardwareLabels, onUpdateHardwareLabel }) {
     const fileInputRef = useRef(null);
@@ -22,7 +22,7 @@ export default function ThemeSelector({ currentTheme, onSelectTheme, onClose, cu
     // Dynamic Premium Lists
     const [premiumThemes, setPremiumThemes] = useState(DEFAULT_PREMIUM_THEMES);
     const [premiumBackgrounds, setPremiumBackgrounds] = useState(DEFAULT_PREMIUM_BACKGROUNDS);
-    const [premiumFeatures, setPremiumFeatures] = useState(['alerts', 'history', 'rgbBorder']);
+    const [premiumFeatures, setPremiumFeatures] = useState([]);
 
     useEffect(() => {
         // Check if user is already PRO (using centralized manager)
@@ -41,7 +41,7 @@ export default function ThemeSelector({ currentTheme, onSelectTheme, onClose, cu
 
     const handleThemeClick = (key) => {
         // Custom theme is now a PREMIUM feature
-        if ((premiumThemes.includes(key) || key === 'custom') && !isPro) {
+        if (premiumThemes.includes(key) && !isPro) {
             setShowUnlockModal(true);
         } else {
             logEvent(analytics, 'select_theme', { theme_name: key });
@@ -139,11 +139,18 @@ export default function ThemeSelector({ currentTheme, onSelectTheme, onClose, cu
 
                         {/* Open Clock Button */}
                         <button
-                            onClick={onOpenClock}
-                            className="flex items-center gap-2 px-3 py-1.5 rounded-full border border-blue-500/30 bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 transition-all"
+                            onClick={() => {
+                                if (premiumFeatures.includes('clock') && !isPro) {
+                                    setShowUnlockModal(true);
+                                } else {
+                                    onOpenClock();
+                                }
+                            }}
+                            className={`flex items-center gap-2 px-3 py-1.5 rounded-full border border-blue-500/30 bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 transition-all ${premiumFeatures.includes('clock') && !isPro ? 'opacity-75 grayscale-[0.5]' : ''}`}
                         >
                             <Clock size={14} />
                             <span className="text-xs font-bold">Abrir Relógio</span>
+                            {premiumFeatures.includes('clock') && !isPro && <Lock size={10} className="text-yellow-500 ml-1" />}
                         </button>
                     </div>
 
@@ -169,7 +176,7 @@ export default function ThemeSelector({ currentTheme, onSelectTheme, onClose, cu
                             {themeKeys.filter(key => themes[key]).map((key) => {
                                 const theme = themes[key];
                                 const isActive = currentTheme === key;
-                                const isPremium = premiumThemes.includes(key) || key === 'custom';
+                                const isPremium = premiumThemes.includes(key);
                                 const isLocked = isPremium && !isPro;
                                 const previewColors = getThemePreviewColors(theme);
 
@@ -252,7 +259,7 @@ export default function ThemeSelector({ currentTheme, onSelectTheme, onClose, cu
                             <button
                                 key={bg.id}
                                 onClick={() => {
-                                    const isPremiumBg = premiumBackgrounds.includes(bg.id) || bg.id === 'custom';
+                                    const isPremiumBg = premiumBackgrounds.includes(bg.id);
                                     if (isPremiumBg && !isPro) {
                                         setShowUnlockModal(true);
                                         return;
@@ -270,14 +277,14 @@ export default function ThemeSelector({ currentTheme, onSelectTheme, onClose, cu
                                         ? 'border-cyan-500 bg-cyan-500/10'
                                         : 'border-gray-800 hover:border-gray-600 hover:bg-gray-800/50'
                                     }
-                                    ${(premiumBackgrounds.includes(bg.id) || bg.id === 'custom') && !isPro ? 'opacity-75 grayscale-[0.5]' : ''}
+                                    ${(premiumBackgrounds.includes(bg.id)) && !isPro ? 'opacity-75 grayscale-[0.5]' : ''}
                                     `}
                             >
                                 <Icon size={20} className={isActive ? 'text-cyan-400' : 'text-gray-500'} />
                                 <span className={`text-xs font-bold ${isActive ? 'text-cyan-400' : 'text-gray-400'}`}>{bg.name}</span>
 
                                 {/* Lock Icon for Premium Backgrounds */}
-                                {(premiumBackgrounds.includes(bg.id) || bg.id === 'custom') && !isPro && (
+                                {(premiumBackgrounds.includes(bg.id)) && !isPro && (
                                     <div className="absolute top-1 right-1">
                                         <Lock size={10} className="text-yellow-500" />
                                     </div>
@@ -304,8 +311,14 @@ export default function ThemeSelector({ currentTheme, onSelectTheme, onClose, cu
                 <h3 className="text-sm font-bold text-gray-400 uppercase tracking-wider mb-3 flex items-center gap-2">
                     <span className="w-1 h-4 bg-yellow-500 rounded-full"></span>
                     Renomear Hardware
+                    {premiumFeatures.includes('hardwareRenaming') && !isPro && <Lock size={12} className="text-yellow-500" />}
                 </h3>
-                <div className="grid grid-cols-3 gap-4 mb-6">
+                <div className={`grid grid-cols-3 gap-4 mb-6 ${premiumFeatures.includes('hardwareRenaming') && !isPro ? 'opacity-50 pointer-events-none' : ''}`} onClick={(e) => {
+                    if (premiumFeatures.includes('hardwareRenaming') && !isPro) {
+                        e.stopPropagation();
+                        setShowUnlockModal(true);
+                    }
+                }}>
                     <div className="flex flex-col gap-2">
                         <label className="text-xs text-gray-500">CPU</label>
                         <input
@@ -314,6 +327,7 @@ export default function ThemeSelector({ currentTheme, onSelectTheme, onClose, cu
                             placeholder="CPU"
                             onChange={(e) => onUpdateHardwareLabel && onUpdateHardwareLabel('cpu', e.target.value)}
                             className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-yellow-500"
+                            disabled={premiumFeatures.includes('hardwareRenaming') && !isPro}
                         />
                     </div>
                     <div className="flex flex-col gap-2">
@@ -324,6 +338,7 @@ export default function ThemeSelector({ currentTheme, onSelectTheme, onClose, cu
                             placeholder="GPU"
                             onChange={(e) => onUpdateHardwareLabel && onUpdateHardwareLabel('gpu', e.target.value)}
                             className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-yellow-500"
+                            disabled={premiumFeatures.includes('hardwareRenaming') && !isPro}
                         />
                     </div>
                     <div className="flex flex-col gap-2">
@@ -334,9 +349,13 @@ export default function ThemeSelector({ currentTheme, onSelectTheme, onClose, cu
                             placeholder="RAM"
                             onChange={(e) => onUpdateHardwareLabel && onUpdateHardwareLabel('ram', e.target.value)}
                             className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-yellow-500"
+                            disabled={premiumFeatures.includes('hardwareRenaming') && !isPro}
                         />
                     </div>
                 </div>
+                {premiumFeatures.includes('hardwareRenaming') && !isPro && (
+                    <div className="absolute mt-[-80px] w-full h-[80px] z-10" onClick={() => setShowUnlockModal(true)}></div>
+                )}
 
                 {/* RGB Border Toggle */}
                 <div className="flex items-center justify-between p-3 bg-gray-800/50 rounded-xl border border-gray-700 mb-4">
@@ -376,10 +395,13 @@ export default function ThemeSelector({ currentTheme, onSelectTheme, onClose, cu
                     </button>
                 </div>
 
+
+
                 {/* Font Selector */}
                 <h3 className="text-sm font-bold text-gray-400 uppercase tracking-wider mb-3 flex items-center gap-2">
                     <Code size={14} />
                     Fonte Personalizada
+                    {premiumFeatures.includes('customFont') && !isPro && <Lock size={12} className="text-yellow-500" />}
                 </h3>
                 <div className="grid grid-cols-2 gap-2 mb-4">
                     {[
@@ -390,11 +412,17 @@ export default function ThemeSelector({ currentTheme, onSelectTheme, onClose, cu
                     ].map(font => (
                         <button
                             key={font.id}
-                            onClick={() => onUpdateGlobalSettings && onUpdateGlobalSettings('customFont', font.id)}
-                            className={`p-3 rounded-xl border-2 transition-all text-left ${globalSettings?.customFont === font.id
+                            onClick={() => {
+                                if (premiumFeatures.includes('customFont') && !isPro && font.id !== 'default') {
+                                    setShowUnlockModal(true);
+                                } else {
+                                    onUpdateGlobalSettings && onUpdateGlobalSettings('customFont', font.id);
+                                }
+                            }}
+                            className={`p-3 rounded-xl border-2 transition-all text-left relative overflow-hidden ${globalSettings?.customFont === font.id
                                 ? 'border-cyan-500 bg-cyan-500/10'
                                 : 'border-gray-700 bg-gray-800/50 hover:border-gray-600'
-                                }`}
+                                } ${premiumFeatures.includes('customFont') && !isPro && font.id !== 'default' ? 'opacity-75' : ''}`}
                         >
                             <div className={`text-sm font-bold text-white mb-1 ${font.class}`} style={{ fontFamily: font.preview }}>
                                 {font.name}
@@ -402,6 +430,11 @@ export default function ThemeSelector({ currentTheme, onSelectTheme, onClose, cu
                             <div className={`text-xs text-gray-500 ${font.class}`} style={{ fontFamily: font.preview }}>
                                 Abc 123
                             </div>
+                            {premiumFeatures.includes('customFont') && !isPro && font.id !== 'default' && (
+                                <div className="absolute top-2 right-2">
+                                    <Lock size={12} className="text-yellow-500" />
+                                </div>
+                            )}
                         </button>
                     ))}
                 </div>

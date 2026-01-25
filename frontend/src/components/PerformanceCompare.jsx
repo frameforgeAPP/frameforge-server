@@ -8,11 +8,14 @@ export default function PerformanceCompare({ session1, session2, onClose }) {
 
     const getDiff = (val1, val2, lowerIsBetter = false) => {
         const diff = val2 - val1;
-        if (Math.abs(diff) < 0.5) return { value: 0, icon: Minus, color: 'text-gray-500' };
+        if (Math.abs(diff) < 0.5) return { value: 0, percent: 0, icon: Minus, color: 'text-gray-500' };
 
         const isPositive = lowerIsBetter ? diff < 0 : diff > 0;
+        const percent = val1 !== 0 ? ((diff / val1) * 100) : 0;
+
         return {
             value: Math.abs(diff),
+            percent: Math.abs(percent),
             icon: isPositive ? ArrowUpRight : ArrowDownRight,
             color: isPositive ? 'text-green-400' : 'text-red-400'
         };
@@ -115,6 +118,7 @@ export default function PerformanceCompare({ session1, session2, onClose }) {
                                         <div className={`absolute -top-2 -right-2 flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-black ${diff.color}`}>
                                             <DiffIcon className="w-3 h-3" />
                                             <span className="text-xs font-bold">{Math.round(diff.value)}</span>
+                                            <span className="text-[10px] opacity-80">({Math.round(diff.percent)}%)</span>
                                         </div>
                                     )}
                                 </div>

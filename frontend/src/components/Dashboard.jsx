@@ -1,13 +1,16 @@
-import React, { useState, useEffect } from 'react';
-import { Cpu, CircuitBoard, HardDrive, MonitorPlay, Maximize, Minimize, Clock as ClockIcon, Circle, Smartphone, X, Heart, Palette, ChevronLeft, Sun, Moon, Bell, Home, AlertTriangle, History, Lock as LockIcon } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { Cpu, CircuitBoard, HardDrive, MonitorPlay, Maximize, Minimize, Clock as ClockIcon, Circle, Smartphone, X, Heart, Palette, ChevronLeft, Sun, Moon, Bell, Home, AlertTriangle, History, Lock as LockIcon, Edit2, Share2, Instagram, Facebook, MessageCircle, Send, Twitter, Gamepad2, Flame, RotateCcw } from 'lucide-react';
 import { LineChart, Line, ResponsiveContainer, YAxis } from 'recharts';
 import { ScreenBrightness } from '@capacitor-community/screen-brightness';
 import { Capacitor } from '@capacitor/core';
+import { Share } from '@capacitor/share';
+import { toPng } from 'html-to-image';
 import QRCode from 'react-qr-code';
 import GameSummary from './GameSummary';
 import DonationModal from './DonationModal';
 import UnlockModal from './UnlockModal';
 import ThemeSelector from './ThemeSelector';
+import GameNameModal from './GameNameModal';
 import SessionHistory from './SessionHistory';
 import { saveSession } from '../utils/sessionStorage';
 import { t } from '../utils/i18n';
@@ -21,15 +24,36 @@ import PulseBackground from './PulseBackground';
 import ColorPickerModal from './ColorPickerModal';
 import HardwareSettings from './HardwareSettings';
 import Clock from './Clock';
+import ConfigGuideModal from './ConfigGuideModal';
+import PerformanceCompareModal from './PerformanceCompareModal';
+
 import { themes } from '../utils/themes';
 import { getAlertsSettings, triggerVibration, triggerSound } from '../utils/alertsUtils';
 import { PremiumManager } from '../utils/PremiumManager';
 import { ConfigService } from '../utils/ConfigService';
 
-export default function Dashboard({ data, toggleFullScreen, isFullscreen, connected, serverAddress, setServerAddress, isDemo, exitDemo, onOpenAlerts, onReturnToConfig }) {
+// Helper to format time (MM:SS)
+const formatTime = (seconds) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+};
+
+
+
+export default function Dashboard({ data, toggleFullScreen, isFullscreen, connected, serverAddress, setServerAddress, isDemo, exitDemo, onOpenAlerts, onReturnToConfig, pingServer }) {
     // Check Afterburner Status
     const [showAfterburnerAlert, setShowAfterburnerAlert] = useState(false);
 
+    useEffect(() => {
+        if (data && (data.afterburner_status === 'not-found' || data.afterburner_status === 'installed')) {
+            setShowAfterburnerAlert(true);
+        } else {
+            setShowAfterburnerAlert(false);
+        }
+    }, [data]);
+
+    // Optimize: Fetch Remote Config ONLY ONCE on mount
     useEffect(() => {
         // Sync Remote Config (Check if Free for Everyone)
         PremiumManager.syncRemoteConfig().then(isFree => {
@@ -42,13 +66,7 @@ export default function Dashboard({ data, toggleFullScreen, isFullscreen, connec
         ConfigService.getPremiumConfiguration().then(config => {
             setPremiumFeatures(config.premiumFeatures);
         });
-
-        if (data && (data.afterburner_status === 'not-found' || data.afterburner_status === 'installed')) {
-            setShowAfterburnerAlert(true);
-        } else {
-            setShowAfterburnerAlert(false);
-        }
-    }, [data]);
+    }, []);
     // Initialize viewMode from localStorage or default to 'default'
     const [viewMode, setViewMode] = useState(() => {
         return localStorage.getItem('dashboardViewMode') || 'default';
@@ -68,7 +86,7 @@ export default function Dashboard({ data, toggleFullScreen, isFullscreen, connec
         return saved !== null ? JSON.parse(saved) : true;
     });
     const [localIp, setLocalIp] = useState("");
-    const [premiumFeatures, setPremiumFeatures] = useState(['alerts', 'history', 'rgbBorder']); // Default locked features
+    const [premiumFeatures, setPremiumFeatures] = useState([]); // Default locked features (Empty = Free by default)
     const [isPro, setIsPro] = useState(false);
 
     useEffect(() => {
@@ -77,9 +95,15 @@ export default function Dashboard({ data, toggleFullScreen, isFullscreen, connec
             setIsPro(status);
         };
         checkPro();
+        checkPro();
         // Listen for storage changes in case pro status updates
         window.addEventListener('storage', checkPro);
-        return () => window.removeEventListener('storage', checkPro);
+        window.addEventListener('premium_status_changed', checkPro);
+
+        return () => {
+            window.removeEventListener('storage', checkPro);
+            window.removeEventListener('premium_status_changed', checkPro);
+        };
     }, []);
 
     // Custom Theme State
@@ -96,6 +120,28 @@ export default function Dashboard({ data, toggleFullScreen, isFullscreen, connec
     const [showClock, setShowClock] = useState(false);
     const [showControls, setShowControls] = useState(false);
     const [showHardwareSettings, setShowHardwareSettings] = useState(false);
+    const [showConfigGuide, setShowConfigGuide] = useState(false);
+    const [showCompareModal, setShowCompareModal] = useState(false);
+    const [showShareMenu, setShowShareMenu] = useState(false);
+    const [previousSession, setPreviousSession] = useState(null);
+    const [latency, setLatency] = useState(null);
+    const [sessionTimer, setSessionTimer] = useState(0);
+    const [fpsSmoothing, setFpsSmoothing] = useState(false);
+
+    // Latency Check Loop
+    useEffect(() => {
+        if (!connected || !pingServer) return;
+
+        const checkLatency = async () => {
+            const ms = await pingServer();
+            if (ms >= 0) setLatency(ms);
+        };
+
+        checkLatency(); // Initial check
+        const interval = setInterval(checkLatency, 2000);
+        return () => clearInterval(interval);
+    }, [connected, pingServer]);
+
     const [hardwareLabels, setHardwareLabels] = useState(() => {
         const defaults = { cpu: 'CPU', gpu: 'GPU', ram: 'RAM' };
         try {
@@ -111,23 +157,57 @@ export default function Dashboard({ data, toggleFullScreen, isFullscreen, connec
         localStorage.setItem('dashboardHardwareLabels', JSON.stringify(newLabels));
     };
 
-    // Demo Mode Theme Cycling
+    // Demo Mode Logic (Cycling Themes & Screens)
     useEffect(() => {
-        if (!isDemo) return;
+        if (!isDemo) {
+            // Reset states when exiting demo
+            setShowConfigGuide(false);
+            setShowThemeSelector(false);
+            setShowHistory(false);
+            return;
+        }
 
-        const demoThemes = ['default', 'matrix', 'cyberpunk', 'synthwave', 'minecraft'];
+        const demoSteps = [
+            { type: 'dashboard', theme: 'default', alert: false },
+            { type: 'dashboard', theme: 'matrix', alert: true }, // Simulate alert
+            // { type: 'modal', modal: 'config' }, // Removed as requested
+            { type: 'modal', modal: 'themes' },
+            { type: 'modal', modal: 'history' },
+            { type: 'dashboard', theme: 'cyberpunk', alert: false }
+        ];
+
         let currentIndex = 0;
 
         const interval = setInterval(() => {
-            currentIndex = (currentIndex + 1) % demoThemes.length;
-            setCurrentTheme(demoThemes[currentIndex]);
-            // Also toggle RGB border for effect
-            if (currentIndex === 1) { // Matrix
-                setGlobalSettings(prev => ({ ...prev, rgbBorder: true }));
-            } else {
-                setGlobalSettings(prev => ({ ...prev, rgbBorder: false }));
+            currentIndex = (currentIndex + 1) % demoSteps.length;
+            const step = demoSteps[currentIndex];
+
+            // Reset all modals first
+            setShowConfigGuide(false);
+            setShowThemeSelector(false);
+            setShowHistory(false);
+
+            // Reset simulated alerts
+            if (!step.alert) {
+                setActiveAlerts({ cpu: false, gpu: false, fps: false });
             }
-        }, 5000);
+
+            if (step.type === 'dashboard') {
+                setCurrentTheme(step.theme);
+                // Toggle RGB border for Matrix
+                setGlobalSettings(prev => ({ ...prev, rgbBorder: step.theme === 'matrix' }));
+
+                if (step.alert) {
+                    // Simulate high temp alert
+                    setActiveAlerts({ cpu: true, gpu: false, fps: false });
+                }
+            } else if (step.type === 'modal') {
+                if (step.modal === 'config') setShowConfigGuide(true);
+                if (step.modal === 'themes') setShowThemeSelector(true);
+                if (step.modal === 'history') setShowHistory(true);
+            }
+
+        }, 4000); // Switch every 4 seconds
 
         return () => clearInterval(interval);
     }, [isDemo]);
@@ -292,6 +372,7 @@ export default function Dashboard({ data, toggleFullScreen, isFullscreen, connec
     const [lastGameName, setLastGameName] = useState("");
 
     // Fetch Local IP for QR Code
+
     useEffect(() => {
         if (showConnectModal) {
             fetch('/api/ip')
@@ -300,6 +381,57 @@ export default function Dashboard({ data, toggleFullScreen, isFullscreen, connec
                 .catch(err => console.error("Failed to fetch IP", err));
         }
     }, [showConnectModal]);
+
+    // Game Name Edit Logic
+    const [showGameNameModal, setShowGameNameModal] = useState(false);
+    const [showEditIcon, setShowEditIcon] = useState(false);
+    const [editIconTimeout, setEditIconTimeout] = useState(null);
+
+    useEffect(() => {
+        if (data && data.game) {
+            setShowEditIcon(true);
+            if (editIconTimeout) clearTimeout(editIconTimeout);
+            const timeout = setTimeout(() => setShowEditIcon(false), 10000);
+            setEditIconTimeout(timeout);
+        } else {
+            setShowEditIcon(false);
+        }
+        return () => {
+            if (editIconTimeout) clearTimeout(editIconTimeout);
+        };
+    }, [data?.game]);
+
+    const handleGameNameClick = (e) => {
+        e.stopPropagation();
+        setShowEditIcon(true);
+        if (editIconTimeout) clearTimeout(editIconTimeout);
+        const timeout = setTimeout(() => setShowEditIcon(false), 10000);
+        setEditIconTimeout(timeout);
+    };
+
+    const handleSaveGameName = async (executable, newName) => {
+        try {
+            console.log(`Saving game name: ${executable} -> ${newName} to ${serverAddress}/api/set-game-name`);
+            const response = await fetch(`${serverAddress}/api/set-game-name`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ executable, name: newName })
+            });
+
+            const data = await response.json();
+
+            if (response.ok && data.success) {
+                setShowGameNameModal(false);
+                alert(t('saved_success') || "Salvo com sucesso!");
+            } else {
+                console.error("Server returned error:", data);
+                alert((t('error_saving') || "Erro ao salvar: ") + (data.error || "Unknown error"));
+            }
+        } catch (error) {
+            console.error("Failed to save game name", error);
+            alert((t('error_saving') || "Erro ao salvar: ") + error.message);
+        }
+    };
 
     // Update History & Data Logic
     useEffect(() => {
@@ -316,53 +448,59 @@ export default function Dashboard({ data, toggleFullScreen, isFullscreen, connec
                 gpuTemp: data.gpus[0]?.temperature || 0
             }]);
         }
+
+        // Sync FPS Smoothing state from server
+        if (data.fps_smoothing !== undefined) {
+            setFpsSmoothing(data.fps_smoothing);
+        }
     }, [data, isRecording]);
 
-    // Alerts Checking
-    const [lastAlertTime, setLastAlertTime] = useState(0);
+    // Alerts Checking & Visual State
+    const [activeAlerts, setActiveAlerts] = useState({ cpu: false, gpu: false, fps: false });
+    const lastSoundTime = useRef(0);
+
     useEffect(() => {
         if (!data) return;
 
         const alertSettings = getAlertsSettings();
-        if (!alertSettings.enabled) return;
-
-        const now = Date.now();
-        const cooldownMs = (alertSettings.cooldownSeconds || 30) * 1000;
-
-        // Check if we're still in cooldown
-        if (now - lastAlertTime < cooldownMs) return;
+        if (!alertSettings.enabled) {
+            setActiveAlerts({ cpu: false, gpu: false, fps: false });
+            return;
+        }
 
         const cpuTemp = data.cpu?.temp || 0;
         const gpuTemp = data.gpus?.[0]?.temperature || 0;
         const fps = data.fps || 0;
 
-        let shouldAlert = false;
+        const newAlerts = {
+            cpu: alertSettings.cpuAlertEnabled !== false && cpuTemp > alertSettings.cpuTempLimit,
+            gpu: alertSettings.gpuAlertEnabled !== false && gpuTemp > alertSettings.gpuTempLimit,
+            fps: alertSettings.fpsAlertEnabled !== false && fps > 5 && fps < alertSettings.fpsLowLimit
+        };
 
-        // Check thresholds
-        // Check thresholds with individual toggles
-        if (alertSettings.cpuAlertEnabled !== false && cpuTemp > alertSettings.cpuTempLimit) {
-            console.log('Alert: CPU temp exceeded', cpuTemp, '>', alertSettings.cpuTempLimit);
-            shouldAlert = true;
-        }
-        if (alertSettings.gpuAlertEnabled !== false && gpuTemp > alertSettings.gpuTempLimit) {
-            console.log('Alert: GPU temp exceeded', gpuTemp, '>', alertSettings.gpuTempLimit);
-            shouldAlert = true;
-        }
-        if (alertSettings.fpsAlertEnabled !== false && fps > 0 && fps < alertSettings.fpsLowLimit) {
-            console.log('Alert: FPS too low', fps, '<', alertSettings.fpsLowLimit);
-            shouldAlert = true;
-        }
+        setActiveAlerts(newAlerts);
 
-        if (shouldAlert) {
-            setLastAlertTime(now);
-            if (alertSettings.vibrate) {
-                triggerVibration([200, 100, 200, 100, 200]);
-            }
-            if (alertSettings.sound) {
-                triggerSound();
+        // Sound Logic (Throttled to every 1.5s for continuous feel without chaos)
+        // Disable sound in Demo Mode
+        if (isDemo) return;
+
+        const now = Date.now();
+        if (now - lastSoundTime.current > 1500) {
+            if (newAlerts.fps) {
+                triggerSound('fps');
+                if (alertSettings.vibrate) triggerVibration([100, 50, 100]);
+                lastSoundTime.current = now;
+            } else if (newAlerts.cpu) {
+                triggerSound('cpu');
+                if (alertSettings.vibrate) triggerVibration([200]);
+                lastSoundTime.current = now;
+            } else if (newAlerts.gpu) {
+                triggerSound('gpu');
+                if (alertSettings.vibrate) triggerVibration([200]);
+                lastSoundTime.current = now;
             }
         }
-    }, [data, lastAlertTime]);
+    }, [data]);
 
     // Automatic Game Detection
     useEffect(() => {
@@ -419,26 +557,116 @@ export default function Dashboard({ data, toggleFullScreen, isFullscreen, connec
         }
     }, [isRecording]);
 
-    // Brightness Control Logic (Night Mode)
-    useEffect(() => {
-        const checkBrightness = async () => {
-            const now = new Date();
-            const hour = now.getHours();
-            const isNight = hour >= 22 || hour < 6;
+    // Share Functionality
+    const handleShare = async () => {
+        try {
+            console.log("Starting share process...");
+            setShowShareMenu(false); // Hide menu before capture
 
-            if (isNight) {
+            // Wait for menu to hide
+            await new Promise(resolve => setTimeout(resolve, 300));
+
+            const element = document.getElementById('dashboard-content');
+            if (!element) {
+                console.error("Dashboard content element not found!");
+                alert("Erro: Elemento de captura não encontrado.");
+                return;
+            }
+
+            console.log("Capturing canvas with html-to-image...");
+            // Use html-to-image which supports modern CSS (like oklch) better than html2canvas
+            const base64 = await toPng(element, {
+                backgroundColor: '#000000', // Force black background
+                pixelRatio: 2, // High quality
+                cacheBust: true,
+                filter: (node) => !node.hasAttribute?.('data-html2canvas-ignore') // Ignore elements with this attribute
+            });
+
+            console.log("Canvas captured, base64 length:", base64.length);
+
+            if (Capacitor.isNativePlatform()) {
+                console.log("Sharing via Capacitor...");
                 try {
-                    await ScreenBrightness.setBrightness({ brightness: 0.1 });
-                } catch (e) {
-                    console.error("Failed to set brightness", e);
+                    // Write to temp file for better compatibility
+                    const { Filesystem, Directory } = await import('@capacitor/filesystem');
+                    const fileName = `frameforge_share_${Date.now()}.png`;
+
+                    await Filesystem.writeFile({
+                        path: fileName,
+                        data: base64,
+                        directory: Directory.Cache
+                    });
+
+                    const uri = await Filesystem.getUri({
+                        directory: Directory.Cache,
+                        path: fileName
+                    });
+
+                    await Share.share({
+                        title: 'FrameForge Stats',
+                        text: `Game: ${data.game || 'Unknown'} - FPS: ${fps}`,
+                        url: uri.uri,
+                        dialogTitle: 'Compartilhar Estatísticas'
+                    });
+                    console.log("Share successful");
+                } catch (shareError) {
+                    console.error("Share failed:", shareError);
+                    alert("Erro ao compartilhar: " + shareError.message);
                 }
+            } else {
+                // Web Fallback
+                console.log("Web fallback: downloading image");
+                const link = document.createElement('a');
+                link.download = `frameforge-${Date.now()}.png`;
+                link.href = base64;
+                link.click();
+            }
+
+        } catch (error) {
+            console.error("Critical error in handleShare:", error);
+            alert("Erro ao gerar imagem: " + error.message);
+        }
+    };
+
+
+
+    // Brightness Control Logic (Night Mode)
+    const originalBrightness = useRef(null);
+
+    useEffect(() => {
+        const handleBrightness = async () => {
+            try {
+                // Save original brightness
+                const { brightness } = await ScreenBrightness.getBrightness();
+                if (originalBrightness.current === null) {
+                    originalBrightness.current = brightness;
+                }
+
+                const now = new Date();
+                const hour = now.getHours();
+                const isNight = hour >= 22 || hour < 6;
+
+                if (isNight) {
+                    await ScreenBrightness.setBrightness({ brightness: 0.1 });
+                } else if (originalBrightness.current !== null) {
+                    // Restore if it's day and we have a saved value
+                    await ScreenBrightness.setBrightness({ brightness: originalBrightness.current });
+                }
+            } catch (e) {
+                console.error("Failed to manage brightness", e);
             }
         };
 
-        checkBrightness(); // Check on mount
-        const interval = setInterval(checkBrightness, 60000); // Check every minute
+        handleBrightness(); // Check on mount
+        const interval = setInterval(handleBrightness, 60000); // Check every minute
 
-        return () => clearInterval(interval);
+        return () => {
+            clearInterval(interval);
+            // Restore brightness on unmount
+            if (originalBrightness.current !== null) {
+                ScreenBrightness.setBrightness({ brightness: originalBrightness.current }).catch(console.error);
+            }
+        };
     }, []);
 
     // Auto-hide controls after 4 seconds
@@ -509,6 +737,7 @@ export default function Dashboard({ data, toggleFullScreen, isFullscreen, connec
 
     // FPS Color Logic
     const getFpsColor = (fpsVal) => {
+        if (activeAlerts.fps) return "#ef4444";
         if (!fpsVal) return extractColor(theme.colors.danger);
         // Use theme accent color for normal FPS to match theme
         return extractColor(theme.colors.accent);
@@ -530,6 +759,7 @@ export default function Dashboard({ data, toggleFullScreen, isFullscreen, connec
 
     return (
         <div
+            id="dashboard-content"
             onClick={(e) => {
                 // Toggle controls on tap (but not on buttons or modals)
                 const isButton = e.target.closest('button');
@@ -612,21 +842,24 @@ export default function Dashboard({ data, toggleFullScreen, isFullscreen, connec
                         {t('exit_fullscreen')}
                     </button>
                 )}
-
-
             </div>
 
+            {/* Latency Indicator (Top Right, below exit buttons) */}
+
+
             {/* Exit Demo Button - ALWAYS VISIBLE when in demo mode (not affected by showControls) */}
-            {isDemo && onReturnToConfig && (
-                <button
-                    onClick={onReturnToConfig}
-                    className="absolute top-16 right-4 z-50 bg-red-600/90 hover:bg-red-700 text-white px-4 py-2 rounded-lg font-bold shadow-lg border border-red-500 transition-transform hover:scale-105 active:scale-95 flex items-center gap-2 backdrop-blur-sm"
-                    title="Sair do Demo"
-                >
-                    <X size={16} />
-                    <span className="text-sm">Sair Demo</span>
-                </button>
-            )}
+            {
+                isDemo && onReturnToConfig && (
+                    <button
+                        onClick={onReturnToConfig}
+                        className="absolute top-16 right-4 z-50 bg-red-600/90 hover:bg-red-700 text-white px-4 py-2 rounded-lg font-bold shadow-lg border border-red-500 transition-transform hover:scale-105 active:scale-95 flex items-center gap-2 backdrop-blur-sm"
+                        title="Sair do Demo"
+                    >
+                        <X size={16} />
+                        <span className="text-sm">Sair Demo</span>
+                    </button>
+                )
+            }
 
             {/* LEFT SIDEBAR BUTTONS - Hidden until tap */}
             <div className={`absolute left-3 top-1/2 -translate-y-1/2 z-40 flex flex-col gap-2 hidden md:flex transition-all duration-300 ${showControls ? 'opacity-100 translate-x-0' : 'opacity-0 -translate-x-4 pointer-events-none'}`}>
@@ -672,6 +905,22 @@ export default function Dashboard({ data, toggleFullScreen, isFullscreen, connec
                 >
                     <Heart size={18} className="group-hover:scale-110 transition-transform" />
                 </button>
+
+                {/* Restore Purchases Button */}
+                {!isPro && (
+                    <button
+                        onClick={() => {
+                            import('../utils/BillingService').then(({ BillingService }) => {
+                                BillingService.restore();
+                                alert("Verificando compras...");
+                            });
+                        }}
+                        className="p-2 bg-gray-800/50 hover:bg-gray-700/80 rounded-full text-green-400 hover:text-green-500 transition-all backdrop-blur-sm border border-gray-700/50 group"
+                        title="Restaurar Compras"
+                    >
+                        <RotateCcw size={18} className="group-hover:scale-110 transition-transform" />
+                    </button>
+                )}
 
                 {/* History Button */}
                 <button
@@ -756,7 +1005,7 @@ export default function Dashboard({ data, toggleFullScreen, isFullscreen, connec
                 </button>
                 <button onClick={() => {
                     if (premiumFeatures.includes('history') && !isPro) {
-                        setShowDonationModal(true);
+                        setShowUnlockModal(true);
                     } else {
                         setShowHistory(true);
                     }
@@ -775,7 +1024,7 @@ export default function Dashboard({ data, toggleFullScreen, isFullscreen, connec
                 {onOpenAlerts && (
                     <button onClick={() => {
                         if (premiumFeatures.includes('alerts') && !isPro) {
-                            setShowDonationModal(true);
+                            setShowUnlockModal(true);
                         } else {
                             onOpenAlerts();
                         }
@@ -792,56 +1041,123 @@ export default function Dashboard({ data, toggleFullScreen, isFullscreen, connec
                 <button onClick={() => setShowDonationModal(true)} className="p-1.5 rounded-full text-red-400">
                     <Heart size={18} />
                 </button>
+
+                {!isPro && (
+                    <button onClick={() => {
+                        import('../utils/BillingService').then(({ BillingService }) => {
+                            BillingService.restore();
+                            alert("Verificando compras...");
+                        });
+                    }} className="p-1.5 rounded-full text-green-400">
+                        <RotateCcw size={18} />
+                    </button>
+                )}
+            </div>
+
+            {/* RIGHT SIDE SHARE MENU */}
+            <div className={`absolute right-4 top-1/2 -translate-y-1/2 z-40 flex flex-col gap-4 transition-all duration-300 ${showControls ? 'opacity-100 translate-x-0' : 'opacity-0 translate-x-4 pointer-events-none'}`}>
+                <button
+                    onClick={() => setShowShareMenu(!showShareMenu)}
+                    className="p-3 bg-gray-800/50 hover:bg-gray-700/80 rounded-full text-white transition-all backdrop-blur-sm border border-gray-700/50 shadow-lg"
+                >
+                    <Share2 size={20} />
+                </button>
+
+                {/* Share Options Popup - Fixed positioning to stay on screen */}
+                <div className={`absolute right-14 top-1/2 -translate-y-1/2 bg-gray-900/90 backdrop-blur-md border border-gray-700 rounded-2xl p-3 flex flex-col gap-3 transition-all duration-300 origin-right max-h-[80vh] overflow-y-auto ${showShareMenu ? 'scale-100 opacity-100' : 'scale-0 opacity-0 pointer-events-none'}`}>
+                    <button onClick={handleShare} className="p-2 hover:bg-white/10 rounded-xl text-pink-500" title="Instagram">
+                        <Instagram size={20} />
+                    </button>
+                    <button onClick={handleShare} className="p-2 hover:bg-white/10 rounded-xl text-blue-600" title="Facebook">
+                        <Facebook size={20} />
+                    </button>
+                    <button onClick={handleShare} className="p-2 hover:bg-white/10 rounded-xl text-indigo-400" title="Discord">
+                        <Gamepad2 size={20} />
+                    </button>
+                    <button onClick={handleShare} className="p-2 hover:bg-white/10 rounded-xl text-black bg-white" title="TikTok">
+                        <span className="font-bold text-xs">Tk</span>
+                    </button>
+                    <button onClick={handleShare} className="p-2 hover:bg-white/10 rounded-xl text-blue-900 bg-white" title="Steam">
+                        <MonitorPlay size={20} />
+                    </button>
+                    <button onClick={handleShare} className="p-2 hover:bg-white/10 rounded-xl text-green-500" title="WhatsApp">
+                        <MessageCircle size={20} />
+                    </button>
+                    <button onClick={handleShare} className="p-2 hover:bg-white/10 rounded-xl text-orange-500" title="Reddit">
+                        <span className="font-bold text-xs">Rd</span>
+                    </button>
+                    <button onClick={handleShare} className="p-2 hover:bg-white/10 rounded-xl text-white" title="X (Twitter)">
+                        <Twitter size={20} />
+                    </button>
+                    <button onClick={handleShare} className="p-2 hover:bg-white/10 rounded-xl text-blue-400" title="Telegram">
+                        <Send size={20} />
+                    </button>
+                </div>
             </div>
 
 
             {/* BACK BUTTON (Visible only in FPS/Stats views) */}
-            {viewMode !== 'default' && (
-                <button
-                    onClick={(e) => {
-                        e.stopPropagation();
-                        toggleView('default');
-                    }}
-                    className="absolute top-4 left-4 z-50 p-3 bg-gray-800/50 hover:bg-gray-700/80 rounded-full text-gray-400 hover:text-white transition-all backdrop-blur-sm border border-gray-700/50 group"
-                    title={t('back_dashboard')}
-                >
-                    <ChevronLeft size={24} className="group-hover:-translate-x-1 transition-transform" />
-                </button>
-            )}
+            {
+                viewMode !== 'default' && (
+                    <button
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            toggleView('default');
+                        }}
+                        className="absolute top-4 left-4 z-50 p-3 bg-gray-800/50 hover:bg-gray-700/80 rounded-full text-gray-400 hover:text-white transition-all backdrop-blur-sm border border-gray-700/50 group"
+                        title={t('back_dashboard')}
+                    >
+                        <ChevronLeft size={24} className="group-hover:-translate-x-1 transition-transform" />
+                    </button>
+                )
+            }
 
             {/* CONNECT MOBILE MODAL */}
-            {showConnectModal && (
-                <div className="absolute inset-0 z-[100] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setShowConnectModal(false)}>
-                    <div className="bg-gray-900 border border-gray-700 rounded-2xl p-8 max-w-sm w-full flex flex-col items-center shadow-2xl" onClick={e => e.stopPropagation()}>
-                        <div className="flex justify-between w-full items-center mb-6">
-                            <h2 className="text-xl font-bold text-white">{t('connect_mobile')}</h2>
-                            <button onClick={() => setShowConnectModal(false)} className="text-gray-400 hover:text-white">
-                                <X size={24} />
-                            </button>
-                        </div>
+            {
+                showConnectModal && (
+                    <div className="absolute inset-0 z-[100] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setShowConnectModal(false)}>
+                        <div className="bg-gray-900 border border-gray-700 rounded-2xl p-8 max-w-sm w-full flex flex-col items-center shadow-2xl" onClick={e => e.stopPropagation()}>
+                            <div className="flex justify-between w-full items-center mb-6">
+                                <h2 className="text-xl font-bold text-white">{t('connect_mobile')}</h2>
+                                <button onClick={() => setShowConnectModal(false)} className="text-gray-400 hover:text-white">
+                                    <X size={24} />
+                                </button>
+                            </div>
 
-                        <div className="bg-white p-4 rounded-xl mb-6">
-                            {localIp ? (
-                                <QRCode
-                                    value={`http://${localIp}:8000`}
-                                    size={200}
-                                />
-                            ) : (
-                                <div className="w-[200px] h-[200px] flex items-center justify-center text-black">
-                                    Loading IP...
-                                </div>
-                            )}
-                        </div>
+                            <div className="bg-white p-4 rounded-xl mb-6">
+                                {localIp ? (
+                                    <QRCode
+                                        value={`http://${localIp}:8000`}
+                                        size={200}
+                                    />
+                                ) : (
+                                    <div className="w-[200px] h-[200px] flex items-center justify-center text-black">
+                                        Loading IP...
+                                    </div>
+                                )}
+                            </div>
 
-                        <p className="text-gray-400 text-center text-sm mb-2">
-                            {t('scan_instruction')}
-                        </p>
-                        <p className="text-blue-400 font-mono text-xs bg-blue-900/20 px-3 py-1 rounded-full">
-                            {localIp ? `http://${localIp}:8000` : "Detecting..."}
-                        </p>
+                            <p className="text-gray-400 text-center text-sm mb-2">
+                                {t('scan_instruction')}
+                            </p>
+                            <div className="bg-black/50 p-3 rounded-lg border border-gray-800 flex items-center justify-between">
+                                <span className="text-xs text-gray-500">Local IP</span>
+                                <p className="font-mono text-sm text-green-400">
+                                    {localIp ? `http://${localIp}:8000` : "Detecting..."}
+                                </p>
+                            </div>
+
+                            {/* Latency Display */}
+                            <div className="bg-black/50 p-3 rounded-lg border border-gray-800 flex items-center justify-between mt-2">
+                                <span className="text-xs text-gray-500">Ping</span>
+                                <p className={`font-mono text-sm font-bold ${latency < 50 ? 'text-green-400' : latency < 100 ? 'text-yellow-400' : 'text-red-400'}`}>
+                                    {latency !== null ? `${latency} ms` : "--"}
+                                </p>
+                            </div>
+                        </div>
                     </div>
-                </div>
-            )}
+                )
+            }
 
             {/* LEFT PANEL: FPS (Green Focus) */}
             <div
@@ -877,10 +1193,10 @@ export default function Dashboard({ data, toggleFullScreen, isFullscreen, connec
                             ${viewMode === 'fps'
                                 ? 'text-[35vw]'
                                 : 'text-[25vw] md:text-[8rem] lg:text-[12rem]'
-                            }`}
+                            } ${activeAlerts.fps ? 'animate-pulse text-red-500' : ''}`}
                         style={{
                             fontFamily: 'Impact, sans-serif',
-                            color: currentTheme === 'custom' && customColors.fps ? customColors.fps : fpsColor,
+                            color: (!activeAlerts.fps && currentTheme === 'custom' && customColors.fps) ? customColors.fps : fpsColor,
                             filter: `drop-shadow(0 0 ${viewMode === 'fps' ? '50px' : '25px'} ${fpsColor}66)` // 66 is ~40% opacity
                         }}
                         onContextMenu={(e) => { e.preventDefault(); handleLongPress('fps'); }}
@@ -890,14 +1206,56 @@ export default function Dashboard({ data, toggleFullScreen, isFullscreen, connec
 
                     <div className={`flex flex-col items-center gap-1 mt-2 ${viewMode === 'fps' ? 'opacity-50' : ''}`}>
                         {data.game && (
-                            <div className={`text-xl font-bold tracking-widest uppercase ${theme.colors.accent} animate-pulse`}>
+                            <div
+                                onClick={handleGameNameClick}
+                                className={`text-xl font-bold tracking-widest uppercase ${theme.colors.accent} animate-pulse flex items-center gap-2 cursor-pointer`}
+                            >
                                 {data.game}
+                                {showEditIcon && (
+                                    <button
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            setShowGameNameModal(true);
+                                        }}
+                                        className="p-1 bg-blue-500/20 hover:bg-blue-500/40 rounded-full text-blue-400 transition-colors"
+                                    >
+                                        <Edit2 size={16} />
+                                    </button>
+                                )}
                             </div>
                         )}
-                        <div className="flex items-center gap-3">
-                            <div className={`h-2 w-2 rounded-full ${fps > 0 ? 'animate-ping' : ''}`} style={{ backgroundColor: fpsColor }}></div>
+
+
+
+                        <div className="flex items-center gap-3 mt-1">
+                            {/* Green Dot for Comparison */}
+                            {previousSession && isRecording && (
+                                <button
+                                    onClick={(e) => { e.stopPropagation(); setShowCompareModal(true); }}
+                                    className="w-3 h-3 rounded-full bg-green-500 shadow-[0_0_10px_#22c55e] animate-pulse hover:scale-150 transition-transform"
+                                    title="Ver Comparativo"
+                                />
+                            )}
+
                             <div className="text-lg text-gray-400 font-bold tracking-widest uppercase">
-                                {!rtss_connected ? t('no_signal') : fps > 0 ? t('active') : t('idle')}
+                                {!rtss_connected ? (
+                                    <button
+                                        onClick={(e) => { e.stopPropagation(); setShowConfigGuide(true); }}
+                                        className="hover:text-white underline decoration-dashed underline-offset-4 transition-colors"
+                                    >
+                                        {t('no_signal') || 'Ocioso (Dicas)'}
+                                    </button>
+                                ) : fps > 0 ? (
+                                    // Removed "Active" text as requested
+                                    <span></span>
+                                ) : (
+                                    <button
+                                        onClick={(e) => { e.stopPropagation(); setShowConfigGuide(true); }}
+                                        className="hover:text-white underline decoration-dashed underline-offset-4 transition-colors"
+                                    >
+                                        {t('idle') || 'Ocioso (Dicas)'}
+                                    </button>
+                                )}
                             </div>
                         </div>
                     </div>
@@ -905,7 +1263,7 @@ export default function Dashboard({ data, toggleFullScreen, isFullscreen, connec
             </div >
 
             {/* RIGHT PANEL: STATS (Blue Focus) */}
-            < div
+            <div
                 onDoubleClick={() => toggleView('stats')}
                 className={`p-4 ${theme.colors.bg} flex flex-col justify-between gap-3 transition-all duration-500 cursor-pointer select-none md:pl-4
                     ${viewMode === 'stats' ? 'w-full h-full items-center justify-center' : viewMode === 'fps' ? 'w-0 p-0 overflow-hidden opacity-0' : 'w-full h-[60%] md:w-[55%] md:h-full opacity-100'}`}
@@ -930,15 +1288,29 @@ export default function Dashboard({ data, toggleFullScreen, isFullscreen, connec
                         {/* CENTER: Big Blue FPS & Game Name */}
                         <div className="flex flex-col items-center justify-center">
                             {data.game && (
-                                <div className={`${theme.colors.accent} font-bold tracking-[0.2em] text-lg mb-[-2vh] uppercase animate-pulse`}>
+                                <div
+                                    onClick={handleGameNameClick}
+                                    className={`${theme.colors.accent} font-bold tracking-[0.2em] text-lg mb-[-2vh] uppercase animate-pulse flex items-center gap-2 cursor-pointer`}
+                                >
                                     {data.game}
+                                    {showEditIcon && (
+                                        <button
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                setShowGameNameModal(true);
+                                            }}
+                                            className="p-1 bg-blue-500/20 hover:bg-blue-500/40 rounded-full text-blue-400 transition-colors"
+                                        >
+                                            <Edit2 size={16} />
+                                        </button>
+                                    )}
                                 </div>
                             )}
                             <div
-                                className="font-black leading-none tracking-tighter text-[35vw]"
+                                className={`font-black leading-none tracking-tighter text-[25vw] ${activeAlerts.fps ? 'animate-pulse text-red-500' : ''}`}
                                 style={{
                                     fontFamily: 'Impact, sans-serif',
-                                    color: currentTheme === 'custom' && customColors.fps ? customColors.fps : fpsColor,
+                                    color: (!activeAlerts.fps && currentTheme === 'custom' && customColors.fps) ? customColors.fps : fpsColor,
                                     filter: `drop-shadow(0 0 50px ${fpsColor}99)` // 99 is ~60% opacity
                                 }}
                                 onContextMenu={(e) => { e.preventDefault(); handleLongPress('fps'); }}
@@ -951,13 +1323,13 @@ export default function Dashboard({ data, toggleFullScreen, isFullscreen, connec
                         <div className="flex flex-col gap-8 justify-center min-w-[150px]">
                             {/* CPU */}
                             <div
-                                className="flex flex-col items-center w-48 transition-transform"
+                                className="flex flex-col items-center w-48 transition-transform min-w-[12rem]"
                             >
                                 <div className="flex items-center gap-2 mb-1">
                                     <Cpu className={`${theme.colors.highlight} ${getPulseClass(cpu.load)}`} size={24} />
                                     <span className="text-sm text-gray-500 tracking-widest">{hardwareLabels.cpu}</span>
                                 </div>
-                                <span className="text-5xl font-bold mb-2" style={{ color: getCpuColor(cpu.temp) }}>{Math.round(cpu.temp)}°</span>
+                                <span className={`text-5xl font-bold mb-2 ${activeAlerts.cpu ? 'animate-pulse text-red-500' : ''}`} style={{ color: activeAlerts.cpu ? '#ef4444' : getCpuColor(cpu.temp) }}>{Math.round(cpu.temp)}°</span>
                                 {/* Sparkline */}
                                 <div className="w-full h-12">
                                     <ResponsiveContainer width="100%" height="100%">
@@ -975,14 +1347,14 @@ export default function Dashboard({ data, toggleFullScreen, isFullscreen, connec
                                 return (
                                     <div
                                         key={gpu.id}
-                                        className="flex flex-col items-center w-48 transition-transform"
+                                        className="flex flex-col items-center w-48 transition-transform min-w-[12rem]"
                                     >
                                         <div className="flex items-center gap-2 mb-1">
                                             <CircuitBoard className={`${theme.colors.highlight} ${getPulseClass(gpu.load)}`} size={24} />
                                             <span className="text-sm text-gray-500 tracking-widest">{hardwareLabels.gpu}</span>
                                         </div>
                                         <div className="flex gap-4 items-baseline mb-2">
-                                            <span className="text-5xl font-bold" style={{ color: getTempColor(gpu.temperature) }}>{Math.round(gpu.temperature)}°</span>
+                                            <span className={`text-5xl font-bold ${activeAlerts.gpu ? 'animate-pulse text-red-500' : ''}`} style={{ color: activeAlerts.gpu ? '#ef4444' : getTempColor(gpu.temperature) }}>{Math.round(gpu.temperature)}°</span>
                                             <span className="text-2xl font-bold text-gray-400">{gpu.load.toFixed(0)}%</span>
                                         </div>
                                         {/* Sparkline */}
@@ -1004,8 +1376,23 @@ export default function Dashboard({ data, toggleFullScreen, isFullscreen, connec
                     <>
                         {/* Game Name Header */}
                         {data.game && (
-                            <div className={`w-full text-center py-2 ${theme.colors.accent} font-bold tracking-[0.2em] text-xl uppercase animate-pulse`}>
+                            <div
+                                onClick={handleGameNameClick}
+                                className={`w-full text-center py-2 ${theme.colors.accent} font-bold tracking-[0.2em] text-xl uppercase animate-pulse flex items-center justify-center gap-2 cursor-pointer`}
+                            >
                                 {data.game}
+                                {showEditIcon && (
+                                    <button
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            setShowGameNameModal(true);
+                                        }}
+                                        data-html2canvas-ignore="true"
+                                        className="p-1 bg-blue-500/20 hover:bg-blue-500/40 rounded-full text-blue-400 transition-colors"
+                                    >
+                                        <Edit2 size={16} />
+                                    </button>
+                                )}
                             </div>
                         )}
 
@@ -1015,13 +1402,14 @@ export default function Dashboard({ data, toggleFullScreen, isFullscreen, connec
                             return (
                                 <div
                                     key={gpu.id}
-                                    className={`flex-1 rounded-xl border p-4 flex flex-col justify-center relative overflow-hidden group hover:border-orange-500/50 transition-all ${globalSettings?.rgbBorder ? 'rgb-border-animated' : theme.colors.border}`}
-                                    style={{ backgroundColor: 'rgba(17, 24, 39, 0.4)' }}
+                                    className={`flex-1 rounded-xl border p-4 flex flex-col justify-center relative overflow-hidden group hover:border-orange-500/50 transition-all ${globalSettings?.rgbBorder ? 'rgb-border-animated' : theme.colors.border} ${activeAlerts.gpu ? 'animate-pulse border-red-500 bg-red-500/10' : ''}`}
+                                    style={{ backgroundColor: activeAlerts.gpu ? undefined : 'rgba(17, 24, 39, 0.4)' }}
                                 >
                                     <div className="flex justify-between items-center mb-2">
                                         <div className={`flex items-center gap-2 ${theme.colors.highlight}`} style={{ color: currentTheme === 'custom' ? customColors.gpu : undefined }}>
                                             <CircuitBoard size={20} className={getPulseClass(gpu.load)} />
                                             <span className="font-bold tracking-wider">{hardwareLabels.gpu}</span>
+                                            {activeAlerts.gpu && <Flame size={20} className="text-red-500 animate-bounce ml-2" />}
                                         </div>
                                         <div className="flex items-center gap-4">
                                             <div className="text-right">
@@ -1075,17 +1463,20 @@ export default function Dashboard({ data, toggleFullScreen, isFullscreen, connec
 
                         {/* CPU MODULE */}
                         <div
-                            className={`flex-1 rounded-xl border p-4 flex flex-col justify-center relative overflow-hidden group hover:border-red-500/50 transition-all ${globalSettings?.rgbBorder ? 'rgb-border-animated' : theme.colors.border}`}
-                            style={{ backgroundColor: 'rgba(17, 24, 39, 0.4)' }}
+                            className={`flex-1 rounded-xl border p-4 flex flex-col justify-center relative overflow-hidden group hover:border-red-500/50 transition-all ${globalSettings?.rgbBorder ? 'rgb-border-animated' : theme.colors.border} ${activeAlerts.cpu ? 'animate-pulse border-red-500 bg-red-500/10' : ''}`}
+                            style={{ backgroundColor: activeAlerts.cpu ? undefined : 'rgba(17, 24, 39, 0.4)' }}
                         >
                             <div className="flex justify-between items-center mb-2">
                                 <div className={`flex items-center gap-2 ${theme.colors.highlight}`} style={{ color: currentTheme === 'custom' ? customColors.cpu : undefined }}>
                                     <Cpu size={20} className={getPulseClass(cpu.load)} />
                                     <span className="font-bold tracking-wider">{hardwareLabels.cpu}</span>
+                                    {activeAlerts.cpu && <Flame size={20} className="text-red-500 animate-bounce ml-2" />}
                                 </div>
                                 <div className="text-right">
                                     <span className="text-xs text-gray-500 block">{t('temp')}</span>
-                                    <span className="text-2xl font-bold transition-colors" style={{ color: getCpuColor(cpu.temp) }}>{Math.round(cpu.temp)}°C</span>
+                                    <span className="text-2xl font-bold transition-colors" style={{ color: getCpuColor(cpu.temp) }}>
+                                        {cpu.temp > 0 ? Math.round(cpu.temp) + '°C' : 'N/A'}
+                                    </span>
                                 </div>
                             </div>
                             <div className="w-full bg-gray-800 rounded-full h-3 overflow-hidden">
@@ -1121,6 +1512,24 @@ export default function Dashboard({ data, toggleFullScreen, isFullscreen, connec
             {
                 showDonationModal && (
                     <DonationModal onClose={() => setShowDonationModal(false)} />
+                )
+            }
+
+            {
+                showUnlockModal && (
+                    <UnlockModal onClose={() => setShowUnlockModal(false)} />
+                )
+            }
+
+            {
+                showGameNameModal && (
+                    <GameNameModal
+                        isOpen={showGameNameModal}
+                        onClose={() => setShowGameNameModal(false)}
+                        currentName={data.game}
+                        executable={data.game_id || data.game}
+                        onSave={handleSaveGameName}
+                    />
                 )
             }
 
@@ -1193,13 +1602,79 @@ export default function Dashboard({ data, toggleFullScreen, isFullscreen, connec
             }
 
             {/* Hardware Settings Modal */}
-            {showHardwareSettings && (
-                <HardwareSettings
-                    initialLabels={hardwareLabels}
-                    onSave={handleSaveHardwareLabels}
-                    onClose={() => setShowHardwareSettings(false)}
-                />
-            )}
+            {
+                showHardwareSettings && (
+                    <HardwareSettings
+                        initialLabels={hardwareLabels}
+                        onSave={handleSaveHardwareLabels}
+                        onClose={() => setShowHardwareSettings(false)}
+                        fpsSmoothing={fpsSmoothing}
+                        onToggleFpsSmoothing={(enabled) => {
+                            // Optimistic update
+                            setFpsSmoothing(enabled);
+                            // Send to server
+                            if (serverAddress) {
+                                // If we had a direct socket reference we would use it, but here we might need to use a fetch or just rely on the next update
+                                // Since we don't have direct socket access here easily without refactoring, we can use the API if available or just assume the socket is handled in App.jsx
+                                // Actually, Dashboard receives data but doesn't hold the socket. 
+                                // Let's check if we can emit via a prop or if we need to add an API endpoint.
+                                // The plan said "Socket: Emit set_fps_smoothing".
+                                // Dashboard doesn't seem to have the socket instance passed to it directly, only `connected` and `serverAddress`.
+                                // Wait, `pingServer` is passed. 
+                                // Let's assume we can use fetch to a new endpoint or we need to pass the socket emit function.
+                                // Since I added a socket event listener in the backend, I should probably use the socket.
+                                // But `Dashboard.jsx` doesn't have `socket`. 
+                                // Let's look at `App.jsx` or where `Dashboard` is used.
+                                // Ah, I can use a simple fetch to a new API endpoint if I add one, OR I can try to use the `serverAddress` to emit if I had a socket client here.
+                                // Let's add an API endpoint to the backend for consistency with `set-game-name`.
+
+                                // WAIT, I see `setServerAddress` and `pingServer`.
+                                // Let's check `App.jsx` to see how `Dashboard` is rendered.
+                                // I can't see `App.jsx` right now.
+                                // However, `Dashboard` receives `data`.
+
+                                // Let's use a fetch to an API endpoint. It's cleaner than passing socket around if not already there.
+                                // I need to add the API endpoint to `frameforge_server.py` first.
+
+                                fetch(`${serverAddress}/api/set-fps-smoothing`, {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({ enabled })
+                                }).catch(err => console.error("Failed to set smoothing", err));
+                            }
+                        }}
+                    />
+                )
+            }
+
+            {/* Config Guide Modal */}
+            {
+                showConfigGuide && (
+                    <ConfigGuideModal
+                        isOpen={showConfigGuide}
+                        onClose={() => setShowConfigGuide(false)}
+                    />
+                )
+            }
+
+
+
+            {/* Performance Compare Modal */}
+            {
+                showCompareModal && (
+                    <PerformanceCompareModal
+                        isOpen={showCompareModal}
+                        onClose={() => setShowCompareModal(false)}
+                        currentSession={{
+                            gameName: data.game,
+                            avgFps: recordingSession.length > 0 ? recordingSession.reduce((a, b) => a + b.fps, 0) / recordingSession.length : fps,
+                            maxCpuTemp: recordingSession.length > 0 ? Math.max(...recordingSession.map(d => d.cpuTemp)) : cpu.temp,
+                            maxGpuTemp: recordingSession.length > 0 ? Math.max(...recordingSession.map(d => d.gpuTemp)) : (gpus[0]?.temperature || 0)
+                        }}
+                        previousSession={previousSession}
+                    />
+                )
+            }
 
             {
                 showClock && (
