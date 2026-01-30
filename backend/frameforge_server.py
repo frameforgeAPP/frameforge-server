@@ -47,6 +47,11 @@ TRANSLATIONS = {
         "error_qr": "Erro ao gerar QR",
         "connection": "CONEXÃO",
         "devices": "Dispositivos:",
+        "open_panel": "Abrir Painel",
+        "github_updates": "GitHub / Updates",
+        "fps_smoothing": "Suavizar FPS",
+        "fps_smoothing_desc": "Média dos últimos quadros para leitura mais estável",
+
     },
     "en": {
         "status_running": "SERVER RUNNING",
@@ -75,6 +80,11 @@ TRANSLATIONS = {
         "error_qr": "Error generating QR",
         "connection": "CONNECTION",
         "devices": "Devices:",
+        "open_panel": "Open Panel",
+        "github_updates": "GitHub / Updates",
+        "fps_smoothing": "Smooth FPS",
+        "fps_smoothing_desc": "Average of last frames for more stable reading",
+
     }
 }
 
@@ -168,10 +178,8 @@ import qrcode
 from PIL import Image, ImageTk
 import io
 import webbrowser
-from PIL import Image, ImageTk
 import pystray
 from pystray import MenuItem as item
-import qrcode
 
 import json
 
@@ -213,12 +221,10 @@ logger = logging.getLogger(__name__)
 
 # Constants
 APP_NAME = "FrameForge Server"
-APP_VERSION = "1.0"
+APP_VERSION = "1.3"
 REGISTRY_KEY = r"Software\Microsoft\Windows\CurrentVersion\Run"
 SERVER_URL = "https://github.com/frameforgeAPP/frameforge-server"
 CREATE_NO_WINDOW = 0x08000000
-
-# ==================== CONFIG MANAGEMENT ====================
 
 # ==================== CONFIG MANAGEMENT ====================
 
@@ -229,7 +235,7 @@ def load_config():
                 return json.load(f)
     except:
         pass
-    return {"start_minimized": False, "fps_smoothing": False}
+    return {"start_minimized": False}
 
 def save_config(config):
     try:
@@ -293,6 +299,8 @@ server_stats = {
     "status": "Starting...",
     "game": ""
 }
+
+FPS_SMOOTHING = False
 
 # GUI window reference
 gui_window = None
@@ -400,8 +408,9 @@ def get_gpu_stats_nvidia_smi():
         startupinfo.wShowWindow = subprocess.SW_HIDE
         
         # Added 'utilization.memory' and better error handling
+        # Added clocks.gr, power.draw, fan.speed
         result = subprocess.run(
-            ['nvidia-smi', '--query-gpu=index,name,utilization.gpu,memory.used,memory.total,temperature.gpu', 
+            ['nvidia-smi', '--query-gpu=index,name,utilization.gpu,memory.used,memory.total,temperature.gpu,clocks.gr,power.draw,fan.speed', 
              '--format=csv,noheader,nounits'],
             capture_output=True, text=True, startupinfo=startupinfo, creationflags=CREATE_NO_WINDOW
         )
@@ -411,7 +420,7 @@ def get_gpu_stats_nvidia_smi():
             for line in result.stdout.strip().split('\n'):
                 try:
                     parts = [p.strip() for p in line.split(',')]
-                    if len(parts) >= 6:
+                    if len(parts) >= 9:
                         # Safe float conversion
                         def safe_float(val):
                             try:
@@ -425,7 +434,10 @@ def get_gpu_stats_nvidia_smi():
                             "load": safe_float(parts[2]),
                             "memory_used": safe_float(parts[3]),
                             "memory_total": safe_float(parts[4]),
-                            "temperature": safe_float(parts[5])
+                            "temperature": safe_float(parts[5]),
+                            "clock": safe_float(parts[6]),
+                            "power": safe_float(parts[7]),
+                            "fan_speed": safe_float(parts[8])
                         })
                 except:
                     continue
@@ -552,88 +564,169 @@ async def broadcast_stats():
     start_time = asyncio.get_event_loop().time()
     server_stats["status"] = "Running"
     
-    fps_samples = []
     last_broadcast_time = 0
+    last_rtss_time = 0
+    last_rtss_update_ts = 0
     
     # State for delta calculation
     last_total_frames = 0
-    last_sample_time = 0
+    
+    # EMA smoothing for FPS
+    smoothed_fps = 0.0
     
     while monitoring_active:
         try:
             current_time = asyncio.get_event_loop().time()
             
-            # 1. Collect FPS Data
-            fps_data = rtss_reader.read_fps()
-            current_fps = fps_data.get("fps", 0) if fps_data else 0
-            current_total_frames = fps_data.get("total_frames", 0) if fps_data else 0
+            # 1. Diagnostic Mode: Read ALL processes
+            processes = rtss_reader.read_all_processes()
             
-            fps_samples.append(current_fps)
-            if len(fps_samples) > 20:
-                fps_samples.pop(0)
-
-            # 2. Broadcast every 1.0 second
+            # Print status every 1 second
             if current_time - last_broadcast_time >= 1.0:
-                time_diff = current_time - last_broadcast_time
-                last_broadcast_time = current_time
-                
-                config = load_config()
-                smoothing_enabled = config.get("fps_smoothing", False)
-                
-                # Calculate FPS based on setting
-                fps = 0
-                if smoothing_enabled:
-                    # Delta calculation (True FPS)
-                    if last_total_frames > 0 and current_total_frames > last_total_frames:
-                         frames_diff = current_total_frames - last_total_frames
-                         # Avoid spikes if time_diff is too small (shouldn't happen)
-                         if time_diff > 0:
-                             fps = int(frames_diff / time_diff)
-                    else:
-                        # Fallback or first run
-                        fps = current_fps
-                else:
-                    # Instantaneous (last read)
-                    fps = current_fps
-                
-                # Update state
-                last_total_frames = current_total_frames
-                
-                # Clear samples (unused in delta mode but kept for fallback)
-                fps_samples = []
-
-                mahm_data = None
+                print("\n--- RTSS STATUS ---")
+                print(f"DEBUG: Count={len(processes)}")
                 try:
-                    mahm_data = mahm_reader.read_all_stats()
+                    print(f"DEBUG: Raw={processes}")
                 except:
-                    pass
-
-                cpu_percent = psutil.cpu_percent(interval=None)
-                cpu_temp = 0
-                
-                if mahm_data and mahm_data.get("cpu_usage") is not None:
-                    cpu_percent = mahm_data["cpu_usage"]
-                if mahm_data and mahm_data.get("cpu_temp") is not None:
-                    cpu_temp = mahm_data["cpu_temp"]
+                    print("DEBUG: Could not print raw data")
+                    
+                if not processes:
+                    print("No active processes found.")
                 else:
-                    cpu_temp = await get_cpu_temp()
-
-                cpu_freq = psutil.cpu_freq()
-                ram = psutil.virtual_memory()
-                gpus = get_gpu_stats()
+                    for p in processes:
+                        print(f"App: {p['name']} | FPS: {p['fps']} | Time: {p['time']}")
+            
+            # Selection Logic:
+            # 1. Sort by Time (descending) to prioritize the most recently updated process
+            processes.sort(key=lambda x: x['time'], reverse=True)
+            
+            selected_process = None
+            
+            # 2. Pick the first one that has FPS > 0
+            # Since we sorted by time, this will be the most recent active game
+            for p in processes:
+                if p['fps'] > 0:
+                    selected_process = p
+                    break
+            
+            if selected_process:
+                raw_fps = selected_process['fps']
+                current_rtss_time = selected_process['time']
                 
-                server_stats["fps"] = fps
+                # Apply EMA smoothing if enabled
+                if FPS_SMOOTHING:
+                    # Alpha = 0.3 (70% previous value + 30% new value)
+                    # This creates moderate smoothing, similar to RivaTuner
+                    alpha = 0.3
+                    if smoothed_fps == 0:
+                        smoothed_fps = float(raw_fps)  # Initialize
+                    else:
+                        smoothed_fps = (alpha * raw_fps) + ((1 - alpha) * smoothed_fps)
+                        # Cap to prevent overshoot when FPS drops
+                        smoothed_fps = min(smoothed_fps, float(raw_fps))
+                    # Use floor (int) instead of round to never exceed raw FPS
+                    final_fps = int(smoothed_fps)
+                else:
+                    final_fps = raw_fps
+                    smoothed_fps = float(raw_fps)  # Keep synchronized
+                
+                # Construct fps_data for compatibility with later code
+                fps_data = {
+                    "game_name": selected_process['name'],
+                    "game_id": selected_process['name'].lower(), # Simple ID generation
+                    "fps": final_fps
+                }
+                
+                if current_time - last_broadcast_time >= 1.0:
+                    print(f"-> SELECTED: {selected_process['name']} ({final_fps} FPS)")
+            else:
+                final_fps = 0
+                smoothed_fps = 0.0  # Reset when no game active
+                current_rtss_time = 0
+                fps_data = {} # Empty dict
+                
+                if current_time - last_broadcast_time >= 1.0:
+                    print("-> SELECTED: None (0 FPS)")
+
+            # Staleness Check (Zeroing)
+            if current_rtss_time != last_rtss_time:
+                last_rtss_time = current_rtss_time
+                last_rtss_update_ts = current_time
+            
+            if current_time - last_rtss_update_ts > 2.0:
+                final_fps = 0
+                if current_time - last_broadcast_time >= 1.0:
+                    print("-> STATUS: Stale (No updates for > 2s)")
+
+            # 2. Broadcast every 0.5 second
+            if current_time - last_broadcast_time >= 0.5:
+                last_broadcast_time = current_time
+
+                try:
+                    # Re-enable sensors
+                    mahm_data = None
+                    try:
+                        mahm_data = mahm_reader.read_all_stats()
+                    except:
+                        pass
+
+                    cpu_percent = psutil.cpu_percent(interval=None)
+                    cpu_temp = 0
+                    cpu_clock = 0
+                    cpu_power = 0
+                    
+                    if mahm_data:
+                        if mahm_data.get("cpu_temp"): cpu_temp = mahm_data["cpu_temp"]
+                        if mahm_data.get("cpu_clock"): cpu_clock = mahm_data["cpu_clock"]
+                        if mahm_data.get("cpu_power"): cpu_power = mahm_data["cpu_power"]
+                    
+                    # Fallback for CPU Temp
+                    if cpu_temp == 0:
+                        cpu_temp = await get_cpu_temp()
+
+                    cpu_freq = psutil.cpu_freq()
+                    if cpu_clock == 0 and cpu_freq:
+                        cpu_clock = round(cpu_freq.current, 0)
+                        
+                    ram = psutil.virtual_memory()
+                    gpus = get_gpu_stats()
+                except Exception as e:
+                    print(f"DEBUG: Error reading sensors: {e}")
+                    # Fallback values to ensure loop continues
+                    cpu_percent = 0
+                    cpu_temp = 0
+                    cpu_clock = 0
+                    cpu_power = 0
+                    ram = type('obj', (object,), {'percent': 0, 'used': 0, 'total': 0})
+                    gpus = []
+                
+                # Calculate frame time from FPS (ms per frame)
+                frame_time = round(1000 / final_fps, 2) if final_fps > 0 else 0
+                
+                server_stats["fps"] = final_fps
                 server_stats["cpu_temp"] = cpu_temp
                 server_stats["gpu_temp"] = gpus[0]["temperature"] if gpus else 0
                 server_stats["clients"] = len(connected_clients)
                 server_stats["uptime"] = int(asyncio.get_event_loop().time() - start_time)
                 server_stats["game"] = fps_data.get("game_name", "") if fps_data else ""
                 
+                # Enhanced data with all sensors
                 data = {
-                    "cpu": {"load": cpu_percent, "temp": cpu_temp, "freq": cpu_freq.current if cpu_freq else 0},
-                    "ram": {"percent": ram.percent, "used_gb": round(ram.used / (1024**3), 1), "total_gb": round(ram.total / (1024**3), 1)},
-                    "gpus": gpus, "fps": fps,
-                    "fps_smoothing": smoothing_enabled,
+                    "cpu": {
+                        "load": cpu_percent, 
+                        "temp": cpu_temp, 
+                        "freq": cpu_clock,
+                        "power": cpu_power
+                    },
+                    "ram": {
+                        "percent": ram.percent, 
+                        "used_gb": round(ram.used / (1024**3), 1), 
+                        "total_gb": round(ram.total / (1024**3), 1)
+                    },
+                    "gpus": gpus, 
+                    "fps": final_fps,
+                    "frame_time": frame_time,
+                    "fps_smoothing": FPS_SMOOTHING,
                     "rtss_connected": fps_data is not None,
                     "game": fps_data.get("game_name", "") if fps_data else "",
                     "game_id": fps_data.get("game_id", "") if fps_data else "",
@@ -641,12 +734,17 @@ async def broadcast_stats():
                     "system": {"hostname": platform.node(), "os": f"{platform.system()} {platform.release()}"},
                     "client_count": len(connected_clients)
                 }
+                
+                # DEBUG: Confirm data transmission
+                print(f"DEBUG: Sending FPS={final_fps} to {len(connected_clients)} clients")
+                    
                 await sio.emit('hardware_update', data)
             
             # Sleep 100ms (10Hz sampling)
             await asyncio.sleep(0.1)
         except:
-            await asyncio.sleep(1)
+            # Sleep for 100ms (High frequency polling)
+            await asyncio.sleep(0.1)
 
 @sio.event
 async def connect(sid, environ, auth=None):
@@ -690,7 +788,7 @@ async def request_data(sid):
             "cpu": {"load": cpu_percent, "temp": cpu_temp, "freq": cpu_freq.current if cpu_freq else 0},
             "ram": {"percent": ram.percent, "used_gb": round(ram.used / (1024**3), 1), "total_gb": round(ram.total / (1024**3), 1)},
             "gpus": gpus, "fps": fps,
-            "fps_smoothing": config.get("fps_smoothing", False),
+            "fps_smoothing": FPS_SMOOTHING,
             "rtss_connected": fps_data is not None,
             "game": fps_data.get("game_name", "") if fps_data else "",
             "game_id": fps_data.get("game_id", "") if fps_data else "",
@@ -702,20 +800,7 @@ async def request_data(sid):
     except Exception as e:
         print(f"Error sending initial data: {e}")
 
-@sio.event
-async def set_fps_smoothing(sid, enabled):
-    """Update FPS smoothing setting from client"""
-    try:
-        config = load_config()
-        config["fps_smoothing"] = bool(enabled)
-        save_config(config)
-        
-        # Update GUI if running
-        if gui_window and hasattr(gui_window, 'fps_smoothing_var'):
-            gui_window.fps_smoothing_var.set(bool(enabled))
-            
-    except Exception as e:
-        print(f"Error setting FPS smoothing: {e}")
+
 
 @sio.event
 async def set_game_name(sid, data):
@@ -747,25 +832,7 @@ async def api_set_game_name(update: GameNameUpdate):
         print(f"Error setting game name API: {e}")
         return {"success": False, "error": str(e)}
 
-class FpsSmoothingUpdate(BaseModel):
-    enabled: bool
 
-@app.post("/api/set-fps-smoothing")
-async def api_set_fps_smoothing(update: FpsSmoothingUpdate):
-    """Update FPS smoothing setting via HTTP"""
-    try:
-        config = load_config()
-        config["fps_smoothing"] = update.enabled
-        save_config(config)
-        
-        # Update GUI if running
-        if gui_window and hasattr(gui_window, 'fps_smoothing_var'):
-            gui_window.fps_smoothing_var.set(update.enabled)
-            
-        return {"success": True}
-    except Exception as e:
-        print(f"Error setting FPS smoothing API: {e}")
-        return {"success": False, "error": str(e)}
 
 @app.on_event("startup")
 async def startup_event():
@@ -888,6 +955,10 @@ class ServerGUI:
         self.current_theme = self.config.get("theme", "dark")
         self.last_client_count = 0  # For connection animation
         self.afterburner_warning_shown = False
+        
+        # Load smoothing preference
+        global FPS_SMOOTHING
+        FPS_SMOOTHING = self.config.get("fps_smoothing", False)
         
         # Theme color palettes
         self.dark_colors = {
@@ -1263,14 +1334,14 @@ class ServerGUI:
         cb_row2.pack(anchor='w')
         
         self.fps_smoothing_var = ctk.BooleanVar(value=self.config.get("fps_smoothing", False))
-        cb_smooth = ctk.CTkCheckBox(cb_row2, text="Suavizar FPS",
+        cb_smooth = ctk.CTkCheckBox(cb_row2, text=t("fps_smoothing"),
                        variable=self.fps_smoothing_var,
                        font=ctk.CTkFont(size=11),
                        fg_color=self.colors['accent_steam'],
                        hover_color=self.colors['accent_light'],
                        command=self._toggle_fps_smoothing)
         cb_smooth.pack(side='left')
-        CTkToolTip(cb_smooth, "Calcula a média de FPS do último segundo para maior estabilidade (igual overlays de jogos).")
+        CTkToolTip(cb_smooth, t("fps_smoothing_desc"))
         
         # Buttons Row
         btn_row = ctk.CTkFrame(footer, fg_color="transparent")
@@ -1338,8 +1409,12 @@ class ServerGUI:
         self._toggle_start_minimized()
 
     def _toggle_fps_smoothing(self):
-        self.config["fps_smoothing"] = self.fps_smoothing_var.get()
+        global FPS_SMOOTHING
+        FPS_SMOOTHING = self.fps_smoothing_var.get()
+        self.config["fps_smoothing"] = FPS_SMOOTHING
         save_config(self.config)
+
+
         
     def _toggle_theme(self):
         new_theme = "light" if self.current_theme == "dark" else "dark"
@@ -1670,13 +1745,13 @@ def run_tray(gui_ref):
         menu = pystray.Menu(
             item(lambda text: get_status_text(), None, enabled=False),
             item('─────────────', None, enabled=False),
-            item('Abrir Painel', show_gui_action, default=True),
-            item('Abrir no Navegador', open_browser),
-            item('GitHub / Updates', open_github),
+            item(t('open_panel'), show_gui_action, default=True),
+            item(t('open_browser'), open_browser),
+            item(t('github_updates'), open_github),
             item('─────────────', None, enabled=False),
-            item('Iniciar com Windows', toggle_auto_start_tray, checked=lambda item: is_auto_start_enabled()),
+            item(t('start_with_windows'), toggle_auto_start_tray, checked=lambda item: is_auto_start_enabled()),
             item('─────────────', None, enabled=False),
-            item('Sair', quit_action)
+            item(t('exit'), quit_action)
         )
         
         icon = pystray.Icon(APP_NAME, icon_image, APP_NAME, menu)
